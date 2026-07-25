@@ -1,9 +1,11 @@
 import type {
 	CalibrationEstimate,
 	CalibrationSample,
+	ClaimRequest,
 	GhostsResponse,
 	HelloResponse,
 	RoomState,
+	Viewer,
 	ViewerRole,
 	WirePose,
 } from "@core/api.ts";
@@ -48,17 +50,17 @@ export const api = {
 		clientId: string,
 		pose: WirePose,
 		extra: { name?: string; ambiguous?: boolean; contribute?: boolean } = {},
-	) => postJson<{ ok: true }>(`/api/s/${token}/pose`, { clientId, pose, ...extra }),
+		// The viewer comes back clamped and with a server-derived tier. When a
+		// scan redirects onward, those are the numbers that travel -- so what a
+		// destination receives is exactly what the room recorded, never a
+		// second opinion computed on the phone.
+	) => postJson<{ ok: true; viewer: Viewer }>(`/api/s/${token}/pose`, { clientId, pose, ...extra }),
 
 	leave: (token: string, clientId: string) =>
 		postJson<{ ok: true }>(`/api/s/${token}/leave`, { clientId }),
 
-	claim: (token: string, ownerToken: string, label?: string, allowNames?: boolean) =>
-		postJson<{ ok: true; room: RoomState }>(`/api/s/${token}/claim`, {
-			ownerToken,
-			label,
-			allowNames,
-		}),
+	claim: (token: string, ownerToken: string, options: Omit<ClaimRequest, "ownerToken"> = {}) =>
+		postJson<{ ok: true; room: RoomState }>(`/api/s/${token}/claim`, { ownerToken, ...options }),
 
 	clear: (token: string, ownerToken: string) =>
 		postJson<{ ok: true }>(`/api/s/${token}/clear`, { ownerToken }),

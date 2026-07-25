@@ -92,11 +92,10 @@ test.describe("the scene", () => {
 		const readout = page.getByTestId("readout");
 		const text = await readout.innerText();
 		expect(text).toMatch(/\d+×\d+/);
-		expect(text).toMatch(/\d+ pts/);
-		expect(text).toMatch(/rms \d+\.\d+px/);
-		expect(text).toMatch(/margin/);
+		expect(text).toMatch(/\d+ reference points/);
+		expect(text).toMatch(/model fit \d+\.\d+ px/);
 		// No display was connected during this test.
-		expect(text).toContain("detached");
+		expect(text).toContain("display offline");
 	});
 
 	test("never uploads a photograph", async ({ page }) => {

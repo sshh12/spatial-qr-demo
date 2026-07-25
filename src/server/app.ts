@@ -1,11 +1,14 @@
 import type {
 	CalibrationSample,
+	ClaimRequest,
 	HelloRequest,
 	HelloResponse,
 	PoseRequest,
 	Viewer,
 } from "@core/api.ts";
+import { tierFromPose } from "@core/api.ts";
 import type { MarkerLayout } from "@core/marker.ts";
+import { normaliseDestination } from "@core/redirect.ts";
 import { decodeToken, TokenError } from "@core/token.ts";
 import type { Ports } from "@storage/ports.ts";
 import { Hono } from "hono";
@@ -26,7 +29,6 @@ import {
 	roomTopic,
 	sanitiseName,
 	saveRoom,
-	tierFromPose,
 	toRoomState,
 } from "./domain.ts";
 
@@ -282,13 +284,28 @@ export function createApp(options: AppOptions): Hono {
 	api.post("/s/:token/claim", limitWrites, async (c) => {
 		const token = requireToken(c.req.param("token"));
 		if (!token) return c.json({ error: "bad-token" }, 400);
-		const body = await readJson<{
-			ownerToken: string;
-			label?: string;
-			allowNames?: boolean;
-		}>(c);
+		const body = await readJson<ClaimRequest>(c);
 		if (!body?.ownerToken || body.ownerToken.length < 16) {
 			return c.json({ error: "bad-request" }, 400);
+		}
+
+		// Settled before anything is loaded or written: a destination this server
+		// will not send a visitor to must fail loudly at the moment it is offered,
+		// not silently vanish and leave a creator wondering why nobody arrives.
+		let redirect: string | null | undefined;
+		if (body.redirect === null || body.redirect === "") {
+			redirect = null;
+		} else if (body.redirect !== undefined) {
+			redirect = normaliseDestination(body.redirect);
+			if (!redirect) {
+				return c.json(
+					{
+						error: "bad-redirect",
+						detail: "Needs a full https:// address, at most 512 characters.",
+					},
+					400,
+				);
+			}
 		}
 
 		const at = now();
@@ -301,6 +318,7 @@ export function createApp(options: AppOptions): Hono {
 		room.persistent = true;
 		room.label = sanitiseName(body.label, true);
 		room.allowNames = Boolean(body.allowNames);
+		if (redirect !== undefined) room.redirect = redirect;
 		await saveRoom(store, room);
 		return c.json({ ok: true, room: await toRoomState(room, bus, token) });
 	});

@@ -1,6 +1,7 @@
 import type { Ghost } from "@core/api.ts";
 import type { MarkerLayout } from "@core/marker.ts";
 import { estimateRange, focalPxFromEquiv, moduleCountForVersion } from "@core/marker.ts";
+import { destinationHost } from "@core/redirect.ts";
 import { mintToken, payloadForToken, versionForPayload } from "@core/token.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navigate } from "../App.tsx";
@@ -331,6 +332,17 @@ export function Display({ token: routeToken }: { token: string | null }) {
 				</section>
 			)}
 
+			{room?.redirect && (
+				<p
+					className="rounded border border-[var(--hex-line)] px-4 py-3 font-mono text-xs text-[var(--hex-dim)]"
+					data-testid="redirect-notice"
+				>
+					Solved scans continue to{" "}
+					<span className="text-[var(--hex-muted)]">{destinationHost(room.redirect)}</span> with the
+					measured position on the URL.
+				</p>
+			)}
+
 			<Explainer range={range} />
 
 			<footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--hex-line)] pt-5 text-xs text-[var(--hex-dim)]">
@@ -403,7 +415,10 @@ function Explainer({
 			</h2>
 
 			{range && (
-				<p className="rounded border border-[var(--hex-line)] px-4 py-3 font-mono text-xs text-[var(--hex-dim)]">
+				<p
+					className="rounded border border-[var(--hex-line)] px-4 py-3 font-mono text-xs text-[var(--hex-dim)]"
+					data-testid="range-line"
+				>
 					<span className="text-[var(--hex-text)]">Estimated reliable range</span> ·{" "}
 					{range.maxDistanceM.toFixed(1)} m, or {range.maxDistanceScreenHeights.toFixed(1)} display
 					heights · assumes a 1920 px capture

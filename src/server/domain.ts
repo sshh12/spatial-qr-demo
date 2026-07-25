@@ -9,7 +9,6 @@ import type {
 import { CALIBRATION_MIN_SAMPLES } from "@core/api.ts";
 import type { MarkerLayout } from "@core/marker.ts";
 import { decodeToken } from "@core/token.ts";
-import type { ConfidenceTier } from "@core/types.ts";
 import type { EventBus, Store } from "@storage/ports.ts";
 
 export const ROOM_TTL_MS = 4 * 60 * 60 * 1000;
@@ -30,6 +29,8 @@ export interface StoredRoom {
 	label: string | null;
 	allowNames: boolean;
 	persistent: boolean;
+	/** Validated destination for solved scans, or null for the demo's own result. */
+	redirect: string | null;
 	ownerTokenHash: string | null;
 	createdAt: number;
 	layout: MarkerLayout | null;
@@ -108,14 +109,6 @@ function round(v: number, places: number): number {
 	return Math.round(v * k) / k;
 }
 
-/** Tier is derived from the four numbers, never taken from the client. */
-export function tierFromPose(pose: WirePose): ConfidenceTier {
-	const relative = pose.sd / pose.dh;
-	if (relative <= 0.12) return "solid";
-	if (relative <= 0.35) return "soft";
-	return "refused";
-}
-
 export function sanitiseName(raw: string | undefined, allowed: boolean): string | null {
 	if (!allowed || !raw) return null;
 	const cleaned = raw
@@ -147,6 +140,7 @@ export function emptyRoom(token: string, now: number): StoredRoom {
 		label: null,
 		allowNames: false,
 		persistent: false,
+		redirect: null,
 		ownerTokenHash: null,
 		createdAt: now,
 		layout: null,
@@ -192,6 +186,8 @@ export async function toRoomState(
 		label: room.label,
 		allowNames: room.allowNames,
 		persistent: room.persistent,
+		// Rooms written before this field existed decode without it.
+		redirect: room.redirect ?? null,
 		createdAt: room.createdAt,
 		layout: room.layout,
 		layoutAt: room.layoutAt,

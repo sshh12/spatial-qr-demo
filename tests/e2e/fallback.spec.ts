@@ -30,7 +30,7 @@ test.describe("no camera", () => {
 		await expect(page.getByTestId("plan-view")).toBeVisible();
 
 		// It leads to the same room, not a dead end.
-		const submit = page.getByRole("button", { name: /that's where i am/i });
+		const submit = page.getByRole("button", { name: /add my position/i });
 		await expect(submit).toBeEnabled();
 		await submit.click();
 		await expect(page.getByRole("button", { name: /position added/i })).toBeVisible();

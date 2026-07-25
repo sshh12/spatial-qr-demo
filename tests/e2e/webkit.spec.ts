@@ -60,7 +60,7 @@ test.describe("WebKit", () => {
 		// connection" on a page that was already secure. This is the fix.
 		await expect(page.getByTestId("stage-no-camera")).toBeVisible();
 		await expect(page.getByTestId("plan-view")).toBeVisible();
-		await expect(page.getByText(/doesn't offer a camera API/i)).toBeVisible();
+		await expect(page.getByText(/cannot access a camera/i)).toBeVisible();
 		await expect(page.getByTestId("stage-fatal")).toHaveCount(0);
 	});
 
@@ -101,7 +101,7 @@ test.describe("WebKit", () => {
 		} else {
 			await expect(page.getByTestId("stage-no-camera")).toBeVisible();
 			await page.getByLabel("Angle left or right of screen centre").fill("40");
-			await page.getByRole("button", { name: /that's where i am/i }).click();
+			await page.getByRole("button", { name: /add my position/i }).click();
 			await expect(page.getByRole("button", { name: /position added/i })).toBeVisible();
 		}
 		expect(navigations).toBe(0);

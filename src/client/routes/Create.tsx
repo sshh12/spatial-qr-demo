@@ -1,3 +1,10 @@
+import {
+	buildRedirectUrl,
+	EXAMPLE_REDIRECT_FACTS,
+	MAX_DESTINATION_LENGTH,
+	normaliseDestination,
+	REDIRECT_SCHEMA,
+} from "@core/redirect.ts";
 import { mintToken } from "@core/token.ts";
 import type { Surface } from "@core/types.ts";
 import { useEffect, useMemo, useState } from "react";
@@ -32,6 +39,7 @@ export function Create() {
 	const [cardWidthCss, setCardWidthCss] = useState(340);
 	const [preset, setPreset] = useState(PRESETS[3]!);
 	const [label, setLabel] = useState("");
+	const [destination, setDestination] = useState("");
 	const [zoomed, setZoomed] = useState(false);
 	const [commons, setCommons] = useState<{ median: number; n: number } | null>(null);
 	const [acceptedCommons, setAcceptedCommons] = useState(false);
@@ -79,6 +87,11 @@ export function Create() {
 	const screenHeightMm = window.screen.height * mmPerCssPx;
 	const measured = mode === "ruler" && !acceptedCommons;
 
+	// The same check the server will apply, run here only so the answer arrives
+	// while the field still has focus rather than after a round trip.
+	const redirect = useMemo(() => normaliseDestination(destination), [destination]);
+	const badDestination = destination.trim().length > 0 && !redirect;
+
 	const onCreate = async () => {
 		// The full-bleed marker box is 88% of the viewport height; the symbol edge
 		// is 25/33 of that box, because the four-module quiet zone on each side is
@@ -108,7 +121,13 @@ export function Create() {
 		}
 
 		const owner = mintOwnerToken(token);
-		await api.claim(token, owner, label.trim() || undefined, false).catch(() => {});
+		await api
+			.claim(token, owner, {
+				label: label.trim() || undefined,
+				allowNames: false,
+				redirect: redirect ?? null,
+			})
+			.catch(() => {});
 		rememberRoom({ token, label: label.trim() || null, at: Date.now() });
 		navigate(`/d/${token}`);
 	};
@@ -261,12 +280,38 @@ export function Create() {
 						className="rounded border border-[var(--hex-line)] bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-[var(--hex-accent)]"
 					/>
 				</label>
+
+				<label className="flex flex-col gap-2 text-sm">
+					<span className="text-[var(--hex-muted)]">Send scanners onward (optional)</span>
+					<input
+						value={destination}
+						maxLength={MAX_DESTINATION_LENGTH}
+						onChange={(e) => setDestination(e.target.value)}
+						placeholder="https://example.com/arrive"
+						inputMode="url"
+						data-testid="redirect-input"
+						aria-invalid={badDestination}
+						aria-describedby="redirect-help"
+						className={`rounded border bg-transparent px-3 py-2 font-mono text-sm outline-none ${
+							badDestination
+								? "border-[var(--hex-danger)]"
+								: "border-[var(--hex-line)] focus:border-[var(--hex-accent)]"
+						}`}
+					/>
+					<span id="redirect-help" className="text-xs text-[var(--hex-dim)]">
+						{badDestination
+							? "Needs a full https:// address."
+							: "Leave this empty to show the demo's own result. Fill it in and a solved scan goes here instead, with the measured position on the end of the URL."}
+					</span>
+				</label>
+
+				{redirect && <RedirectSchema destination={redirect} />}
 			</section>
 
 			<button
 				type="button"
 				onClick={onCreate}
-				disabled={zoomed}
+				disabled={zoomed || badDestination}
 				data-testid="create-room"
 				className="self-start rounded bg-[var(--hex-accent)] px-5 py-3 font-mono text-sm text-black disabled:opacity-40"
 			>
@@ -277,6 +322,57 @@ export function Create() {
 				Screen size affects the estimate in metres. It does not change either angle.
 			</p>
 		</main>
+	);
+}
+
+/**
+ * The contract, shown at the moment somebody opts into it.
+ *
+ * Built by calling the real `buildRedirectUrl` on the real destination, so what
+ * a creator reads here is the string their server will actually receive rather
+ * than a hand-written approximation of it. The table comes from the same
+ * exported schema the tests assert against.
+ */
+function RedirectSchema({ destination }: { destination: string }) {
+	const example = useMemo(
+		() => buildRedirectUrl(destination, EXAMPLE_REDIRECT_FACTS),
+		[destination],
+	);
+
+	return (
+		<div
+			className="flex flex-col gap-4 rounded border border-[var(--hex-line)] px-4 py-4"
+			data-testid="redirect-schema"
+		>
+			<div className="flex flex-col gap-2">
+				<p className="text-sm text-[var(--hex-muted)]">A scan from 31° to the left will open:</p>
+				<code
+					className="block overflow-x-auto rounded bg-[var(--hex-surface)] px-3 py-2 font-mono text-[11px] break-all text-[var(--hex-text)]"
+					data-testid="redirect-example"
+				>
+					{example}
+				</code>
+			</div>
+
+			<dl className="flex flex-col gap-2.5">
+				{REDIRECT_SCHEMA.map((field) => (
+					<div key={field.name} className="flex flex-col gap-0.5">
+						<dt className="font-mono text-[11px] text-[var(--hex-accent)]">{field.name}</dt>
+						<dd className="text-xs leading-relaxed text-[var(--hex-dim)]">{field.meaning}</dd>
+					</div>
+				))}
+			</dl>
+
+			<p className="text-xs leading-relaxed text-[var(--hex-warn)]">
+				These numbers are measured on the visitor&apos;s phone and are not signed. Anyone can type
+				this URL by hand with any values in it, so treat the position as a hint for what to show —
+				never as proof of where somebody was.
+			</p>
+			<p className="text-xs leading-relaxed text-[var(--hex-dim)]">
+				Your own query string and fragment are kept. Any <code>sqr_</code> parameters already in the
+				address are replaced.
+			</p>
+		</div>
 	);
 }
 

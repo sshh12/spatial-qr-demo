@@ -1,5 +1,8 @@
-import type { Ghost, Viewer } from "@core/api.ts";
+import type { Ghost, Viewer, WirePose } from "@core/api.ts";
+import { tierFromPose } from "@core/api.ts";
 import type { MarkerLayout } from "@core/marker.ts";
+import type { RedirectFacts } from "@core/redirect.ts";
+import { buildRedirectUrl, destinationHost, reportedTier } from "@core/redirect.ts";
 import { decodeToken } from "@core/token.ts";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { captureBurst } from "../capture/burst.ts";
@@ -71,6 +74,9 @@ export function Scan({ token }: { token: string }) {
 	const [ghosts, setGhosts] = useState<readonly Ghost[]>([]);
 	const [detectorReady, setDetectorReady] = useState(false);
 	const [screenshot, setScreenshot] = useState(false);
+	/** What was reported for this visitor, and therefore what may travel onward. */
+	const [reported, setReported] = useState<Omit<RedirectFacts, "token"> | null>(null);
+	const [stayed, setStayed] = useState(false);
 
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const previewCanvas = useRef<HTMLCanvasElement>(document.createElement("canvas"));
@@ -115,6 +121,19 @@ export function Scan({ token }: { token: string }) {
 	 */
 	const layout: MarkerLayout | null = room?.layout ?? null;
 	const detached = !layout;
+
+	/**
+	 * The onward destination, if this code was created with one.
+	 *
+	 * Derived rather than latched, because the room can arrive after the solve
+	 * does on a slow connection. Latching it at any single moment would mean a
+	 * fast solve silently loses the redirect the creator configured.
+	 */
+	const destination = room?.redirect ?? null;
+	const handoffUrl = useMemo(
+		() => (destination && reported ? buildRedirectUrl(destination, { ...reported, token }) : null),
+		[destination, reported, token],
+	);
 
 	const activeLayout: MarkerLayout | null = useMemo(() => {
 		if (layout) return layout;
@@ -308,7 +327,26 @@ export function Scan({ token }: { token: string }) {
 			symbolEdgeMm: activeLayout.symbolEdgeMm,
 			sizeSigmaRel: DEFAULT_SIZE_SIGMA_REL,
 		});
-		void api.pose(token, me.current, pose, { ambiguous: solved.branchMargin < 3 }).catch(() => {});
+		// Optimistic first, so a phone that has lost the network still reaches the
+		// destination it was sent to; overwritten by the clamped, server-tiered
+		// numbers the moment they come back.
+		setReported({
+			pose,
+			tier: reportedTier(tierFromPose(pose)),
+			source: "measured",
+			at: Date.now(),
+		});
+		void api
+			.pose(token, me.current, pose, { ambiguous: solved.branchMargin < 3 })
+			.then(({ viewer }) => {
+				setReported({
+					pose: viewer.pose ?? pose,
+					tier: reportedTier(viewer.tier),
+					source: "measured",
+					at: viewer.at,
+				});
+			})
+			.catch(() => {});
 		void refresh().catch(() => {});
 
 		// Every solid solve converges a focal length. Aggregated by device
@@ -432,26 +470,47 @@ export function Scan({ token }: { token: string }) {
 
 			{stage === "blocked" && <BlockedByApp inApp={inApp} onCopy={() => copyLink()} />}
 
-			{stage === "no-camera" && displayContext && (
-				<NoCamera token={token} clientId={me.current} ghosts={ghosts} reason={failure} />
-			)}
+			{stage === "no-camera" &&
+				displayContext &&
+				(handoffUrl && reported ? (
+					<Handoff url={handoffUrl} facts={reported} />
+				) : (
+					<NoCamera
+						token={token}
+						clientId={me.current}
+						ghosts={ghosts}
+						reason={failure}
+						onPlaced={setReported}
+					/>
+				))}
 
-			{stage === "result" && solved?.primary && displayContext && (
-				<Result
-					solved={solved}
-					display={displayContext}
-					viewers={room?.viewers ?? []}
-					ghosts={ghosts}
-					meId={me.current}
-					eyes={eyes}
-					onToggleEyes={() => setEyes((v) => !v)}
-					frozen={frozenCanvas.current}
-					aspect={(spec.aspectNum || 16) / (spec.aspectDen || 9)}
-					detached={detached}
-					screenshot={screenshot}
-					onScreenshot={() => setScreenshot(true)}
-				/>
-			)}
+			{stage === "result" &&
+				solved?.primary &&
+				displayContext &&
+				(handoffUrl && reported && !stayed ? (
+					<Handoff
+						url={handoffUrl}
+						facts={reported}
+						onShowResult={() => setStayed(true)}
+						detached={detached}
+					/>
+				) : (
+					<Result
+						solved={solved}
+						display={displayContext}
+						viewers={room?.viewers ?? []}
+						ghosts={ghosts}
+						meId={me.current}
+						eyes={eyes}
+						onToggleEyes={() => setEyes((v) => !v)}
+						frozen={frozenCanvas.current}
+						aspect={(spec.aspectNum || 16) / (spec.aspectDen || 9)}
+						detached={detached}
+						screenshot={screenshot}
+						onScreenshot={() => setScreenshot(true)}
+						continueUrl={handoffUrl}
+					/>
+				))}
 
 			<Readout
 				stage={stage}
@@ -858,17 +917,158 @@ function FarblingNotice({ onContinue }: { onContinue: () => void }) {
 	);
 }
 
+const HANDOFF_SECONDS = 3;
+
+/**
+ * The onward handoff, for a code created with a destination.
+ *
+ * It takes the place of the result screen rather than sitting after it: someone
+ * who scanned a poster wants the poster's page, and making them scroll past a
+ * 3D scene to reach it would be the demo getting in the way of the product.
+ *
+ * What survives from the result screen is the part that is a promise rather
+ * than a flourish -- the numbers are on screen, in full, before they are sent
+ * anywhere. The countdown gives that a few seconds to be read and can be
+ * stopped by touching the screen or pressing any key, which is also what makes
+ * the timed navigation escapable for somebody using a keyboard or a screen
+ * reader. The destination is shown in full, because a redirect nobody can see
+ * before it happens is just an open redirect with better manners.
+ */
+function Handoff({
+	url,
+	facts,
+	onShowResult,
+	detached,
+}: {
+	url: string;
+	facts: Omit<RedirectFacts, "token">;
+	onShowResult?: () => void;
+	detached?: boolean;
+}) {
+	const [left, setLeft] = useState(HANDOFF_SECONDS);
+	const [paused, setPaused] = useState(false);
+	const host = useMemo(() => destinationHost(url), [url]);
+	const go = useCallback(() => window.location.replace(url), [url]);
+
+	useEffect(() => {
+		if (paused) return;
+		// `replace`, not `assign`: an interstitial is not somewhere the back
+		// button should return anyone to.
+		if (left <= 0) {
+			go();
+			return;
+		}
+		const timer = setTimeout(() => setLeft((v) => v - 1), 1000);
+		return () => clearTimeout(timer);
+	}, [left, paused, go]);
+
+	const { pose } = facts;
+
+	return (
+		<section
+			className="flex min-h-[80vh] flex-col justify-center gap-6"
+			data-testid="handoff"
+			data-seconds={paused ? "paused" : String(left)}
+			onPointerDownCapture={() => setPaused(true)}
+			onKeyDownCapture={() => setPaused(true)}
+		>
+			<div className="flex flex-col gap-2">
+				<h2 className="text-xl leading-snug font-medium">
+					Sending your position to <span className="break-all">{host}</span>.
+				</h2>
+				<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
+					These four numbers, and nothing else. No photograph leaves this phone.
+				</p>
+			</div>
+
+			<dl className="grid grid-cols-2 gap-3 font-mono text-xs">
+				<Stat
+					label="side-to-side angle"
+					value={`${formatSigned(pose.az, 1)}°`}
+					note={pose.az < -2 ? "to the left" : pose.az > 2 ? "to the right" : "straight on"}
+				/>
+				<Stat label="vertical angle" value={`${formatSigned(pose.el, 1)}°`} note="above centre" />
+				<Stat
+					label="display heights"
+					value={`${pose.dh.toFixed(2)} h`}
+					note={`± ${pose.sd.toFixed(2)}`}
+				/>
+				<Stat
+					label="confidence"
+					value={facts.tier}
+					note={facts.source === "manual" ? "placed by hand" : "measured"}
+				/>
+			</dl>
+
+			<details className="rounded border border-[var(--hex-line)] px-4 py-3">
+				<summary className="cursor-pointer font-mono text-xs text-[var(--hex-dim)]">
+					Show the full address
+				</summary>
+				<code
+					className="mt-3 block overflow-x-auto font-mono text-[11px] break-all text-[var(--hex-muted)]"
+					data-testid="handoff-url"
+				>
+					{url}
+				</code>
+			</details>
+
+			{detached && (
+				<p className="rounded border border-[var(--hex-warn)]/40 px-4 py-3 text-xs text-[var(--hex-warn)]">
+					The display was offline, so this was measured from the smaller code you scanned.
+				</p>
+			)}
+
+			<div className="flex flex-col gap-3">
+				<button
+					type="button"
+					onClick={go}
+					data-testid="handoff-continue"
+					className="rounded bg-[var(--hex-accent)] px-5 py-3.5 font-mono text-sm text-black"
+				>
+					{paused ? `Continue to ${host} →` : `Continuing in ${left}… go now →`}
+				</button>
+				{!paused && (
+					<button
+						type="button"
+						onClick={() => setPaused(true)}
+						data-testid="handoff-stay"
+						className="text-center font-mono text-xs text-[var(--hex-dim)] underline"
+					>
+						Wait — don&apos;t send this yet
+					</button>
+				)}
+				{paused && onShowResult && (
+					<button
+						type="button"
+						onClick={onShowResult}
+						className="text-center font-mono text-xs text-[var(--hex-dim)] underline"
+					>
+						See the full measurement instead
+					</button>
+				)}
+			</div>
+
+			<p className="font-mono text-[11px] text-[var(--hex-dim)]" role="status">
+				{paused ? "Stopped. Nothing has been sent." : `Opening ${host} in ${left}…`}
+			</p>
+		</section>
+	);
+}
+
 /** 6.6: a real route, not an apology. Also the accessibility path. */
 function NoCamera({
 	token,
 	clientId: id,
 	ghosts,
 	reason,
+	onPlaced,
 }: {
 	token: string;
 	clientId: string;
 	ghosts: readonly Ghost[];
 	reason: string | null;
+	/** Lifts the placement so a redirect can carry it, marked as hand-placed. */
+	onPlaced?: (facts: Omit<RedirectFacts, "token">) => void;
 }) {
 	const [az, setAz] = useState(-18);
 	const [dh, setDh] = useState(2.4);
@@ -930,9 +1130,16 @@ function NoCamera({
 				disabled={sent}
 				onClick={() => {
 					setSent(true);
+					const pose: WirePose = { az, el: 0, dh, sd: 0.25 };
+					// A destination is told this was placed by hand, not measured, so
+					// it can weigh it accordingly rather than reading dragged sliders
+					// as a photograph.
+					const placed = (p: WirePose, tier: RedirectFacts["tier"]) =>
+						onPlaced?.({ pose: p, tier, source: "manual", at: Date.now() });
 					void api
-						.pose(token, id, { az, el: 0, dh, sd: 0.25 }, { contribute: false })
-						.catch(() => {});
+						.pose(token, id, pose, { contribute: false })
+						.then(({ viewer }) => placed(viewer.pose ?? pose, reportedTier(viewer.tier)))
+						.catch(() => placed(pose, reportedTier(tierFromPose(pose))));
 				}}
 				className="rounded bg-[var(--hex-accent)] px-5 py-3 font-mono text-sm text-black disabled:opacity-40"
 			>
@@ -959,6 +1166,7 @@ function Result({
 	detached,
 	screenshot,
 	onScreenshot,
+	continueUrl,
 }: {
 	solved: SolveResult;
 	display: { edgeToScreenHeight: number; symbolEdgeMm: number; sizeSigmaRel: number };
@@ -972,6 +1180,8 @@ function Result({
 	detached: boolean;
 	screenshot: boolean;
 	onScreenshot: () => void;
+	/** Present only when this code has a destination and the visitor stopped the countdown. */
+	continueUrl: string | null;
 }) {
 	const branch = solved.primary as SerialBranch;
 	const r = makeReadout(branch, display);
@@ -982,6 +1192,16 @@ function Result({
 
 	return (
 		<section className="flex flex-col gap-7 pb-16" data-testid="stage-result">
+			{continueUrl && (
+				<a
+					href={continueUrl}
+					data-testid="result-continue"
+					className="rounded bg-[var(--hex-accent)] px-5 py-3.5 text-center font-mono text-sm text-black"
+				>
+					Continue to {destinationHost(continueUrl)} →
+				</a>
+			)}
+
 			<div className="flex flex-col gap-2">
 				<h2 className="text-xl leading-snug font-medium" data-testid="verdict">
 					Your phone was {describe(r)}.

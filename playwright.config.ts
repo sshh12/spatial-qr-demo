@@ -90,7 +90,7 @@ export default defineConfig({
 		},
 		{
 			name: "desktop",
-			testMatch: /(display|fallback|isolation)\.spec\.ts/,
+			testMatch: /(display|fallback|isolation|redirect)\.spec\.ts/,
 			use: {
 				...devices["Desktop Chrome"],
 				channel: "chromium",

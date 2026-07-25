@@ -138,8 +138,12 @@ test.describe("display", () => {
 
 	test("computes the range table rather than remembering it", async ({ page }) => {
 		await page.goto("/");
-		const line = page.getByText(/Estimated reliable range/);
+		// The whole paragraph, not the styled span inside it: a text locator
+		// resolves to the innermost match, which carries the label and none of
+		// the computed numbers this test exists to check.
+		const line = page.getByTestId("range-line");
 		await expect(line).toBeVisible();
+		await expect(line).toContainText("Estimated reliable range");
 		await expect(line).toContainText("display heights");
 		await expect(line).toContainText("1920 px capture");
 	});

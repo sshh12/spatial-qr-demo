@@ -27,6 +27,22 @@ export interface WirePose {
 
 export const POSE_FIELDS = ["az", "el", "dh", "sd"] as const;
 
+/**
+ * The tier, derived from the four numbers and nothing else.
+ *
+ * It lives here rather than on the server because two places need the same
+ * answer: the server, which computes it on arrival and never accepts one from a
+ * client, and the phone, which needs to label its own result before the round
+ * trip completes. Two implementations of one threshold is how a refusal
+ * boundary and the claim it guards drift apart, so there is only ever one.
+ */
+export function tierFromPose(pose: WirePose): ConfidenceTier {
+	const relative = pose.sd / pose.dh;
+	if (relative <= 0.12) return "solid";
+	if (relative <= 0.35) return "soft";
+	return "refused";
+}
+
 export type ViewerRole = "phone" | "display";
 
 export interface Viewer {
@@ -49,6 +65,12 @@ export interface RoomState {
 	readonly label: string | null;
 	readonly allowNames: boolean;
 	readonly persistent: boolean;
+	/**
+	 * Where a solved scan is sent afterwards, or null for the demo's own result
+	 * screen. Public by construction: the visitor is about to be shown it and
+	 * then taken there, so hiding it from the room state would buy nothing.
+	 */
+	readonly redirect: string | null;
 	readonly createdAt: number;
 	/** What the display says it is showing right now. Null if none is connected. */
 	readonly layout: MarkerLayout | null;
@@ -113,6 +135,18 @@ export interface PoseRequest {
 	readonly name?: string;
 	/** Opt-in contribution to the global normalised commons. */
 	readonly contribute?: boolean;
+}
+
+export interface ClaimRequest {
+	readonly ownerToken: string;
+	readonly label?: string;
+	readonly allowNames?: boolean;
+	/**
+	 * Where solved scans go afterwards. Omit to leave it as it is; null or the
+	 * empty string clears it. Validated by `normaliseDestination` on the server,
+	 * which is the only copy of that check that counts.
+	 */
+	readonly redirect?: string | null;
 }
 
 export interface CalibrationSample {
