@@ -69,12 +69,12 @@ export function App() {
 		default:
 			return (
 				<main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-6">
-					<h1 className="font-mono text-lg text-[var(--hex-text)]">Nothing here</h1>
+					<h1 className="font-mono text-lg text-[var(--hex-text)]">Display not found</h1>
 					<p className="text-sm text-[var(--hex-muted)]">
-						That address does not name a display we know about.
+						We couldn&apos;t find a display at this address.
 					</p>
 					<a className="font-mono text-sm text-[var(--hex-accent)] underline" href="/">
-						Start again
+						Open the demo
 					</a>
 				</main>
 			);

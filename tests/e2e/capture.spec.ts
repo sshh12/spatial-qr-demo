@@ -37,7 +37,7 @@ test.describe("phone capture", () => {
 		const fixture = fixtureFor(testInfo.project.name);
 		const errors = collectErrors(page);
 
-		await page.goto(`/s/${fixture.token}`);
+		await page.goto(`/s/${fixture.token}?debug=1`);
 
 		// S0: no permission request on load, ever.
 		await expect(page.getByTestId("stage-cold")).toBeVisible();
@@ -110,9 +110,9 @@ test.describe("phone capture", () => {
 
 		const before = await readStats(page);
 		const toggle = page.getByTestId("eyes-toggle");
-		await expect(toggle).toContainText("your phone (measured)");
+		await expect(toggle).toContainText("Show estimated eye position");
 		await toggle.click();
-		await expect(toggle).toContainText("your eyes (estimated)");
+		await expect(toggle).toContainText("Show measured phone position");
 
 		const after = await readStats(page);
 		// Eyes are behind the phone, so the reported distance must shrink.

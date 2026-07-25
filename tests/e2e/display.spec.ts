@@ -138,10 +138,10 @@ test.describe("display", () => {
 
 	test("computes the range table rather than remembering it", async ({ page }) => {
 		await page.goto("/");
-		const line = page.getByText(/good to about/);
+		const line = page.getByText(/Estimated reliable range/);
 		await expect(line).toBeVisible();
-		await expect(line).toContainText("screen-heights");
-		await expect(line).toContainText("computed, not remembered");
+		await expect(line).toContainText("display heights");
+		await expect(line).toContainText("1920 px capture");
 	});
 
 	test("how-it-works loads the generated artefacts", async ({ page }) => {

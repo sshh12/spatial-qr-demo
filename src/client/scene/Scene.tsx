@@ -68,9 +68,7 @@ export function Scene(props: SceneProps) {
 				data-testid="scene-fallback"
 				className="flex h-full min-h-48 items-center justify-center px-6 text-center font-mono text-xs text-[var(--hex-muted)]"
 			>
-				3D is unavailable on this device, so the plan view below is the whole story.
-				<br />
-				It has the same numbers in it.
+				3D is unavailable. The plan view below shows the same position and uncertainty.
 			</div>
 		);
 	}
@@ -451,9 +449,7 @@ class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean
 					data-testid="scene-fallback"
 					className="flex h-full min-h-48 items-center justify-center px-6 text-center font-mono text-xs text-[var(--hex-muted)]"
 				>
-					3D is unavailable on this device, so the plan view below is the whole story.
-					<br />
-					It has the same numbers in it.
+					3D is unavailable. The plan view below shows the same position and uncertainty.
 				</div>
 			);
 		}

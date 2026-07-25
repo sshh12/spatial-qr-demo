@@ -23,7 +23,7 @@ test.describe("no camera", () => {
 		await page.goto(`/s/${TOKEN}`);
 
 		await page.getByTestId("begin").click({ timeout: 30_000 });
-		await page.getByRole("button", { name: /place myself on a plan/i }).click();
+		await page.getByRole("button", { name: /place me manually/i }).click();
 
 		const stage = page.getByTestId("stage-no-camera");
 		await expect(stage).toBeVisible();
@@ -33,14 +33,12 @@ test.describe("no camera", () => {
 		const submit = page.getByRole("button", { name: /that's where i am/i });
 		await expect(submit).toBeEnabled();
 		await submit.click();
-		await expect(page.getByRole("button", { name: /you're in the room/i })).toBeVisible();
+		await expect(page.getByRole("button", { name: /position added/i })).toBeVisible();
 	});
 
 	test("declines the camera before asking for it if the visitor says no", async ({ page }) => {
 		await page.goto(`/s/${TOKEN}`);
-		await page
-			.getByRole("button", { name: /rather not use my camera/i })
-			.click({ timeout: 30_000 });
+		await page.getByRole("button", { name: /place me manually/i }).click({ timeout: 30_000 });
 		await expect(page.getByTestId("stage-no-camera")).toBeVisible();
 
 		// No getUserMedia call was ever made.
@@ -53,14 +51,12 @@ test.describe("no camera", () => {
 
 	test("the sliders move the dot", async ({ page }) => {
 		await page.goto(`/s/${TOKEN}`);
-		await page
-			.getByRole("button", { name: /rather not use my camera/i })
-			.click({ timeout: 30_000 });
+		await page.getByRole("button", { name: /place me manually/i }).click({ timeout: 30_000 });
 
 		const before = await page.getByTestId("plan-me").getAttribute("data-testid");
 		expect(before).toBe("plan-me");
 
-		const slider = page.getByLabel("angle from the centre of the screen");
+		const slider = page.getByLabel("Angle left or right of screen centre");
 		await slider.fill("55");
 		await expect(page.getByText(/\+55° right/)).toBeVisible();
 	});

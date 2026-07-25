@@ -32,7 +32,6 @@ export function Create() {
 	const [cardWidthCss, setCardWidthCss] = useState(340);
 	const [preset, setPreset] = useState(PRESETS[3]!);
 	const [label, setLabel] = useState("");
-	const [allowNames, setAllowNames] = useState(false);
 	const [zoomed, setZoomed] = useState(false);
 	const [commons, setCommons] = useState<{ median: number; n: number } | null>(null);
 	const [acceptedCommons, setAcceptedCommons] = useState(false);
@@ -109,7 +108,7 @@ export function Create() {
 		}
 
 		const owner = mintOwnerToken(token);
-		await api.claim(token, owner, label.trim() || undefined, allowNames).catch(() => {});
+		await api.claim(token, owner, label.trim() || undefined, false).catch(() => {});
 		rememberRoom({ token, label: label.trim() || null, at: Date.now() });
 		navigate(`/d/${token}`);
 	};
@@ -117,11 +116,10 @@ export function Create() {
 	return (
 		<main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 px-6 py-10">
 			<header className="flex flex-col gap-3">
-				<h1 className="text-2xl font-medium">Make one for your own screen.</h1>
+				<h1 className="text-2xl font-medium">Create a display</h1>
 				<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
-					Two things go into the code: how wide the square will be in millimetres, and its shape.
-					Everything else lives in the URL, so the code keeps working even if this server forgets it
-					ever existed.
+					Measure the screen so distance can be shown in metres. Its size and shape are stored in
+					the QR URL, so the code does not depend on a saved server record.
 				</p>
 			</header>
 
@@ -130,9 +128,8 @@ export function Create() {
 					className="rounded border border-[var(--hex-danger)]/50 bg-[var(--hex-danger)]/10 px-4 py-3 text-sm text-[var(--hex-danger)]"
 					data-testid="zoom-guard"
 				>
-					Your browser is zoomed to about {Math.round(zoomFactor() * 100)}%. That changes the size
-					of a CSS pixel, which is exactly what the ruler is measuring — reset to 100% before
-					continuing, or the number will be wrong in a way nothing downstream can detect.
+					Reset browser zoom to 100% before measuring. At {Math.round(zoomFactor() * 100)}%, the
+					on-screen outline is not its intended physical size.
 				</p>
 			)}
 
@@ -141,12 +138,10 @@ export function Create() {
 					className="flex flex-col gap-3 rounded border border-[var(--hex-line)] px-4 py-4"
 					data-testid="commons-prefill"
 				>
-					<p className="text-sm text-[var(--hex-muted)}">
-						<span className="text-[var(--hex-text)]">
-							{commons.n} people on hardware like yours
-						</span>{" "}
-						measured {commons.median.toFixed(4)} mm per CSS pixel — that would make your screen
-						about {Math.round(window.screen.height * commons.median)} mm tall. Right?
+					<p className="text-sm text-[var(--hex-muted)]">
+						Measurements from{" "}
+						<span className="text-[var(--hex-text)]">{commons.n} similar devices</span> suggest this
+						screen is about {Math.round(window.screen.height * commons.median)} mm tall.
 					</p>
 					<div className="flex gap-2">
 						<button
@@ -154,14 +149,14 @@ export function Create() {
 							onClick={() => setAcceptedCommons(true)}
 							className="rounded bg-[var(--hex-accent)] px-4 py-2 font-mono text-xs text-black"
 						>
-							yes, use that
+							Use this estimate
 						</button>
 						<button
 							type="button"
 							onClick={() => setCommons(null)}
 							className="rounded border border-[var(--hex-line)] px-4 py-2 font-mono text-xs"
 						>
-							I&apos;ll measure it myself
+							Measure this screen
 						</button>
 					</div>
 				</div>
@@ -182,7 +177,7 @@ export function Create() {
 								: "border-[var(--hex-line)] text-[var(--hex-dim)]"
 						}`}
 					>
-						{m === "ruler" ? "measure with a bank card" : "pick a size"}
+						{m === "ruler" ? "Measure with a bank card" : "Choose a screen size"}
 					</button>
 				))}
 			</div>
@@ -190,9 +185,8 @@ export function Create() {
 			{mode === "ruler" ? (
 				<section className="flex flex-col gap-4" data-testid="card-ruler">
 					<p className="text-sm text-[var(--hex-muted)]">
-						Hold any bank card flat against the screen and drag until the outline matches it
-						exactly. Every ID-1 card in the world is 85.60 × 53.98 mm to within a third of a
-						percent, which makes it a better ruler than most rulers.
+						Hold a standard bank card flat against the screen. Drag the slider until the outline
+						matches it. Standard cards are 85.60 × 53.98 mm.
 					</p>
 					<div
 						className="rounded border border-[var(--hex-accent)] bg-[var(--hex-surface)]"
@@ -209,7 +203,7 @@ export function Create() {
 						value={cardWidthCss}
 						onChange={(e) => setCardWidthCss(Number(e.target.value))}
 						className="accent-[var(--hex-accent)]"
-						aria-label="card width"
+						aria-label="Width of the on-screen card outline"
 						data-testid="ruler-slider"
 					/>
 				</section>
@@ -234,11 +228,13 @@ export function Create() {
 
 			<dl className="grid grid-cols-2 gap-3 font-mono text-xs">
 				<div className="rounded border border-[var(--hex-line)] px-3 py-2">
-					<dt className="text-[var(--hex-dim)]">mm per CSS pixel</dt>
-					<dd className="tabular text-[var(--hex-text)]">{mmPerCssPx.toFixed(4)}</dd>
+					<dt className="text-[var(--hex-dim)]">Screen scale</dt>
+					<dd className="tabular text-[var(--hex-text)]">
+						{mmPerCssPx.toFixed(4)} mm per CSS pixel
+					</dd>
 				</div>
 				<div className="rounded border border-[var(--hex-line)] px-3 py-2">
-					<dt className="text-[var(--hex-dim)]">your screen, about</dt>
+					<dt className="text-[var(--hex-dim)]">Estimated screen height</dt>
 					<dd className="tabular text-[var(--hex-text)]">{Math.round(screenHeightMm)} mm tall</dd>
 				</div>
 			</dl>
@@ -251,7 +247,7 @@ export function Create() {
 				}`}
 				data-testid="calibration-badge"
 			>
-				{measured ? "measured" : acceptedCommons ? "from the commons" : "estimated"}
+				{measured ? "measured" : acceptedCommons ? "based on similar screens" : "estimated"}
 			</span>
 
 			<section className="flex flex-col gap-4 border-t border-[var(--hex-line)] pt-6">
@@ -265,22 +261,6 @@ export function Create() {
 						className="rounded border border-[var(--hex-line)] bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-[var(--hex-accent)]"
 					/>
 				</label>
-
-				<label className="flex items-start gap-3 text-sm">
-					<input
-						type="checkbox"
-						checked={allowNames}
-						onChange={(e) => setAllowNames(e.target.checked)}
-						className="mt-1 accent-[var(--hex-accent)]"
-					/>
-					<span className="text-[var(--hex-muted)]">
-						Let people type a name in this room.{" "}
-						<span className="text-[var(--hex-dim)]">
-							You own it: you get a clear button, and only you. The public demo room has no free
-							text at all, on purpose.
-						</span>
-					</span>
-				</label>
 			</section>
 
 			<button
@@ -290,13 +270,11 @@ export function Create() {
 				data-testid="create-room"
 				className="self-start rounded bg-[var(--hex-accent)] px-5 py-3 font-mono text-sm text-black disabled:opacity-40"
 			>
-				Create this display →
+				Create display →
 			</button>
 
 			<p className="font-mono text-[11px] text-[var(--hex-dim)]">
-				Getting the size wrong scales the distance and leaves every angle untouched — that is a
-				structural property of the maths, not a claim about our code. It is why this step is a
-				nice-to-have rather than a correctness dependency.
+				Screen size affects the estimate in metres. It does not change either angle.
 			</p>
 		</main>
 	);

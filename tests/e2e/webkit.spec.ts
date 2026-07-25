@@ -100,9 +100,9 @@ test.describe("WebKit", () => {
 			await expect(page.getByTestId("stage-aiming")).toBeVisible({ timeout: 25_000 });
 		} else {
 			await expect(page.getByTestId("stage-no-camera")).toBeVisible();
-			await page.getByLabel("angle from the centre of the screen").fill("40");
+			await page.getByLabel("Angle left or right of screen centre").fill("40");
 			await page.getByRole("button", { name: /that's where i am/i }).click();
-			await expect(page.getByRole("button", { name: /you're in the room/i })).toBeVisible();
+			await expect(page.getByRole("button", { name: /position added/i })).toBeVisible();
 		}
 		expect(navigations).toBe(0);
 	});

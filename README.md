@@ -1,197 +1,143 @@
 # spatial-qr
 
-**A QR code that can tell where you were standing when you scanned it.**
+Spatial QR estimates a phone camera's angle and distance from a QR code shown at
+a declared size. The image is processed on the phone and never uploaded.
 
-You are looking at a screen with a square on it. We know exactly how wide that
-square is. You point your phone's camera back at it, and the shape the square
-makes in your photograph — the perspective distortion — is enough to solve for
-where your camera was in the room. One photograph, no depth sensor, no AR
-session, no login. Then the screen you were looking at draws you standing in
-front of it.
+The flow has three steps:
 
-The product spec is [CONCEPT.md](./CONCEPT.md). The maths is at `/how-it-works`,
-rendered from numbers the test suite measures.
+1. A display shows the QR code and reports its measured or estimated size.
+2. A phone captures a short burst, rejects moving frames, and chooses a stable one.
+3. The phone solves its position; the display plots the result.
 
----
+No depth sensor, AR session, account, or face detection is involved.
 
-## Quick start
+## What it measures
+
+| Result | Meaning | Accuracy or dependency |
+|---|---|---|
+| Side-to-side angle | Left or right of the display | about 1–3° |
+| Vertical angle | Above or below its centre | about 1–3° |
+| Distance in display heights | Distance relative to screen height | no physical-size guess |
+| Distance in metres | Uses estimated display and camera data | about ±10–25% |
+
+The result locates the camera, not the person holding it. Display heights avoid
+a physical-size estimate, but still include uncertainty from the image
+measurement. Metres also depend on the declared display size and estimated
+camera focal length, so the UI shows an error bar.
+
+The app refuses captures that are too small, unclear, or ambiguous. If two
+mirror-image positions fit equally well, it asks for another scan after a step
+to the right.
+
+## Run locally
+
+Requires Node.js 24 or newer.
+
+For desktop development:
 
 ```bash
 npm install
-npm run dev            # one process, one port: Vite + the real Hono app
+npm run dev
 ```
 
-Open `http://localhost:5173`, then scan the code with a phone on the same
-network. The phone must reach the page over HTTPS or `localhost` — browsers will
-not hand over a camera otherwise, and Safari will not accept `127.0.0.1` even
-though Chrome will.
+Open `http://localhost:5173`.
+
+For a real phone on the same network:
 
 ```bash
-npm run check          # lint, types, L1, L2 and the bundle budget
-npm run e2e            # browser lanes (needs `npm run e2e:install` once)
-npm run build && npm start
+npm install
+npm run phone
 ```
 
-## What is actually claimed
+`npm run phone` builds the app, starts the server, and prints a local HTTPS
+address. Open that address on the display, accept the self-signed certificate,
+then scan the code. Accept the certificate on the phone too. HTTPS is required
+because browsers do not expose the camera to ordinary LAN HTTP origins.
 
-| Quantity | Recoverable | Honest accuracy |
-|---|---|---|
-| Bearing (azimuth from the display normal) | yes | ~1–3° |
-| Elevation | yes | ~1–3° |
-| Distance in **display heights** | yes, exactly | limited only by pixel noise |
-| Distance in metres | derived | ±10–25%, dominated by two guesses |
-| Which side of the room you were on | *conditionally* | the one failure that matters |
-| Camera focal length | no API; partially solvable from the image | prior + per-frame refinement |
-| Physical display size | no API, ever | declared at creation |
-| Where the *person* is | no — we locate the phone | ~40 cm forward, ~25 cm down |
+Production build:
 
-Distance leads in display heights because that is a ratio of two lengths
-measured in the same pixels: nothing anyone guessed enters into it. Metres come
-second, with a visible bar, because they need the display's physical size and
-the camera's focal length and both are estimates.
+```bash
+npm run build
+npm start
+```
 
-Every solve carries a covariance built from pixel noise, the focal-length
-posterior width and principal-point uncertainty. That single number is what the
-confidence ellipse is drawn from, what the ± on screen means, and what the
-refusal threshold compares against — so the claim and the gate cannot drift
-apart. It is checked against the actual error distribution in CI.
+## Privacy boundaries
 
-## Stack
+The position result contains:
 
-| Layer | Choice |
+- horizontal and vertical angle;
+- distance in display heights;
+- the result's uncertainty.
+
+Solid results can also contribute a coarse device signature and focal estimate
+to pooled calibration. Captured images remain in browser memory for the result
+and are never uploaded. The camera stream stops after capture. The app does not
+detect faces. A share card contains the result diagram, not the camera image.
+
+## Known limits
+
+- Metre distance is not intended to beat roughly ±25%.
+- Curved displays do not fit the planar model. Ultrawide displays are not tested.
+- Keystone-corrected projectors distort the square before the camera sees it.
+- Printed codes without a known physical size provide angles, not metres.
+- The app reports position, not camera orientation or verified identity.
+- The included storage driver supports one server replica and ephemeral history.
+
+## Architecture
+
+| Area | Implementation |
 |---|---|
-| App | Vite 8 (Rolldown) + React 19 SPA, served in production by one Hono process on Node 24. One Railway service, one port, no meta-framework. |
-| Detection | `zxing-wasm` reader-only subpath, self-hosted as a bundled asset. No CDN. |
-| Corner accuracy | Own sub-pixel refiner: gradient-centroid edge sampling in linear light → exhaustive two-point RANSAC → total-least-squares line fit → intersect adjacent lines. |
-| Pose | Normalised DLT homography → closed-form decomposition → explicit mirror branch → LM-refine both, each pinned to its own side → compare by posterior cost. ~450 lines, zero dependencies. |
-| Intrinsics | MAP: log-normal prior at 26 mm-equivalent, golden-section over log *f*, curvature of the cost gives the posterior width. |
-| Capture | rVFC aiming at ~640 px in a Worker → burst at native resolution → motion gate → medoid of survivors → `track.stop()` before WebGL mounts. |
-| 3D | react-three-fiber + drei, 100% procedural geometry, zero downloaded assets. Lazy-loaded. |
-| Styling | Tailwind v4 CSS-first, dark-only, OKLCH — with an sRGB hex mirror per token for three.js, checked for drift by a test. |
-| Storage | Two ports (`Store`, `EventBus`) with explicit capability flags. In-memory driver only in v1; a boot assertion crashes rather than serve a broken multi-replica deployment. |
-| Realtime | SSE with `retry:`, heartbeats, `Last-Event-ID`, `X-Accel-Buffering: no`, excluded from compression. Plus a `?since=` polling fallback. |
-| Tooling | TypeScript strict with `noUncheckedIndexedAccess`, Biome, Vitest, Playwright. |
+| Web app | React 19 and Vite 8, served by a Hono Node process |
+| Detection | `zxing-wasm` plus a local subpixel corner refiner |
+| Position solve | Homography decomposition, both mirror branches, nonlinear refinement |
+| Capture | Worker-based live aiming, native-resolution burst, motion rejection |
+| Result | Procedural React Three Fiber scene plus an SVG plan view |
+| State | Explicit `Store` and `EventBus` ports; in-memory adapters in v1 |
 
-### Conventions
+The scan route stays on one page from permission through result because iOS can
+revoke an “Allow Once” camera grant during navigation. Three.js is loaded only
+for the result, after the camera has stopped.
 
-- **`npm start` must exist and must run the Node server.** Railpack detects Vite
-  projects as static SPAs and deploys them behind Caddy, and the Hono process is
-  then never started. The explicit start script is what prevents that.
-- **Bind `0.0.0.0`.** Binding anything else is the most common cause of
-  Railway's "Application failed to respond".
-- **Chunk control is `codeSplitting`.** It was rollup's `manualChunks`, then
-  rolldown's `advancedChunks`, and is now `output.codeSplitting` in Vite 8.
-- **Never persist image bytes anywhere, for any reason, including behind a debug
-  flag.** There is an end-to-end test that watches every outbound request.
-- **`markerEdgeMm` is the *symbol* edge, excluding the four-module quiet zone.**
-  Measuring the rendered box instead overstates distance by 32% at version 2 —
-  larger than every error the rest of the system controls, and invisible,
-  because every angle stays perfect.
+## Tests
 
-## Testing
+```bash
+npm test          # pure geometry and unit tests
+npm run test:l2   # rendered QR frames through the detector and solver
+npm run e2e       # browser flow and scene checks
+npm run check     # lint, types, L1, L2, and bundle budget
+```
 
-Four tiers, no human in the loop until a real-device pass at the end.
+The L2 generator and production solver use separate projection
+implementations. Browser capture tests feed known QR video frames through the
+real detector and assert on recovered geometry, not only on flow completion.
 
-| Tier | What it is | Command |
-|---|---|---|
-| **L1** | The pure solver and the units. Synthetic correspondences, no images. | `npm test` |
-| **L2** | Ray-traced frames → the real zxing-wasm → the real solver, over a pose × degradation grid. **This is where the numbers come from.** | `npm run test:l2` |
-| **L3** | Playwright Chromium with a fake camera fed real QR content. | `npm run e2e` |
-| **L4** | Structural assertions on the scene graph. | (part of `e2e`) |
+Real-device testing is still required for iOS camera acquisition, autofocus,
+lens distortion, and panel behavior that a synthetic renderer cannot reproduce.
 
-Two things make the suite worth trusting:
+## Project map
 
-**The generator projects through an independently written code path.**
-`tests/support/groundtruth.ts` imports nothing from `src/core` — the vector
-algebra, the camera construction and the projection are all written a second
-time from the definitions. A suite where both sides share a projection would
-pass just as happily with the sign of *y* flipped in both. A separate test pins
-the two derivations of the QR module geometry against each other so a
-disagreement is loud rather than cancelling.
+```text
+src/core/      geometry, marker model, and wire types
+src/client/    capture pipeline, routes, and result views
+src/server/    Hono app and Node entry point
+src/storage/   storage and event-bus ports
+tests/         unit, geometry, rendered-frame, and browser tests
+scripts/       phone HTTPS helper, fixtures, and bundle checks
+```
 
-**Assertions are on geodesic rotation error and translation error, never on
-reprojection error** — reprojection is ~0 by construction for four coplanar
-points and trusting it is the classic false-confidence trap. Everything is
-asserted at p50 and p95, never per-case max.
+The in-app `/how-it-works` page explains the geometry with measurements produced
+by the test suite. [CONCEPT.md](./CONCEPT.md) records the design decisions and
+the implementation findings that revised them.
 
-The browser lanes feed Chromium real QR content through
-`--use-file-for-fake-video-capture` with Y4M files generated from the same
-renderer, at exact known poses, so `capture.spec.ts` asserts on *recovered
-geometry* rather than on the flow completing.
-
-### Where the tests stop
-
-- **Playwright cannot feed QR content into WebKit.** Camera permissions and mock
-  streams work, but the stream is a synthetic pattern. So the WebKit lane covers
-  the permission state machine, the `playsinline`/`muted`/`autoplay` plumbing,
-  the single-page-load guarantee and the no-camera fallback — and acquisition
-  itself is human-verified on real hardware. On Windows, Playwright's WebKit
-  build exposes no `navigator.mediaDevices` at all, so the lane there asserts
-  that the app detects that and routes around it.
-- **No WebGL screenshot diffing.** SwiftShader's automatic fallback was removed
-  in Chrome 137 and a suite that fails on anti-aliasing gets muted within a week.
-- **The synthetic renderer is not a camera.** It models optical blur, sensor
-  noise, ISP sharpening, panel structure, rolling shutter, glare and gamma. It
-  has no colour-filter array, no lens distortion and no autofocus breathing. The
-  measured corner sigma is a floor, not an expectation.
-
-## Non-goals
-
-1. Metric distance better than roughly ±25%. Angles are rigorous; metres are an
-   estimate with a visible bar.
-2. Locating the person rather than the phone. Both are shown, with a toggle.
-3. Curved and ultrawide monitors. The planar model does not apply.
-4. E-ink, single-chip DLP, and keystone-corrected projectors.
-5. Printed codes at unknown scale. Angles only.
-6. Device orientation. Position only — which also spares a second permission
-   prompt for data we decided not to use.
-7. Verified or anti-forgery poses. The pose is computed on your device and
-   reported. It is trivially forgeable, and nothing here depends on it being
-   honest; refusing to upload pixels is worth more.
-8. Horizontal scaling. Single replica by construction with the in-memory driver,
-   enforced by a boot assertion. The seam for a Redis adapter is in place.
-9. Durable live sessions. Feeds and history are ephemeral by design. The QR
-   itself never dies, because the display spec is in the URL.
-10. iOS in-app browsers that block the camera. We detect and instruct; we cannot
-    escape programmatically, and we will not route anyone through a fake
-    Shortcut to try.
-11. Light mode. It's a dark room.
-12. Automated iOS camera acquisition. See "where the tests stop".
-13. Face detection of any kind, ever. Marker geometry is not biometric
-    processing, and adding face detection would flip the GDPR classification
-    into special-category data.
-14. Persisting image bytes anywhere. Solver metadata and corner coordinates only.
-
-## Deploying
+## Deploy
 
 ```bash
 railway up
 ```
 
-`railway.json` is checked in: Railpack builder, `npm start`, one replica, a
-dependency-free healthcheck at `/healthz`. HTTPS is automatic, which satisfies
-the `getUserMedia` secure-context requirement for free.
+[`railway.json`](./railway.json) configures one replica, `npm start`, and the
+`/healthz` check. Production must provide HTTPS for camera access.
 
-`BASE_URL` is an *override*. The request's `Host` header is the source of truth,
-so tunnel URLs and preview deployments work with no environment edit and
-`og:image` URLs stay correct on every origin the app is reachable at.
-
-Note that Cloudflare quick tunnels do not carry SSE. For local phone testing use
-the polling path, a named tunnel, or Tailscale Funnel — otherwise the dev loop
-cannot exercise its own headline feature.
-
-## Layout
-
-```
-src/core/      the maths and the wire contract — pure, isomorphic, no I/O
-src/storage/   two ports and the in-memory driver
-src/server/    createApp({store, bus}) -> Hono, plus the Node entry
-src/client/    the SPA: capture pipeline, scene, routes
-tests/support/ the independent generator, the renderer, the conformance suite
-tests/{l1,l2,unit,e2e}/
-scripts/       fixture generation, the bundle gate, the test TLS terminator
-```
-
-## Licence
+## License
 
 MIT. See [LICENSE](./LICENSE).

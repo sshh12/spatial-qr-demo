@@ -24,6 +24,8 @@ export interface BurstOptions {
 export interface BurstOutcome {
 	/** The frame the answer comes from, or null if nothing survived. */
 	readonly chosen: SolveResult | null;
+	/** A representative unresolved mirror pair, when that is why no answer survived. */
+	readonly ambiguous: SolveResult | null;
 	readonly survivors: readonly SolveResult[];
 	readonly attempted: number;
 	readonly rejectedForMotion: number;
@@ -118,6 +120,7 @@ export async function captureBurst(options: BurstOptions): Promise<BurstOutcome>
 	}
 
 	let survivors = results.filter((r, i) => r.ok && !moved[i]);
+	const ambiguous = medoid(results.filter((r) => r.reason?.code === "ambiguous"));
 	const rejectedForMotion = results.filter((r, i) => r.ok && moved[i]).length;
 	rejectedBySolver = results.filter((r) => !r.ok).length;
 
@@ -127,6 +130,7 @@ export async function captureBurst(options: BurstOptions): Promise<BurstOutcome>
 
 	return {
 		chosen: medoid(survivors),
+		ambiguous,
 		survivors,
 		attempted: results.length,
 		rejectedForMotion,

@@ -142,7 +142,11 @@ export function Marker({
 				className={`fixed inset-0 z-50 flex items-center justify-center bg-white ${className}`}
 				style={{ paddingTop: `${viewport.h * 0.04}px` }}
 			>
-				<canvas ref={canvasRef} className="marker-canvas" aria-label="Spatial QR marker" />
+				<canvas
+					ref={canvasRef}
+					className="marker-canvas"
+					aria-label="QR code used to measure camera position"
+				/>
 				{brackets?.specs.map((spec, i) => (
 					<Bracket
 						key={`${spec.corner.x}-${spec.corner.y}-${i}`}
@@ -156,7 +160,11 @@ export function Marker({
 
 	return (
 		<div ref={wrapRef} className={className} data-testid="marker-idle">
-			<canvas ref={canvasRef} className="marker-canvas" aria-label="Spatial QR marker" />
+			<canvas
+				ref={canvasRef}
+				className="marker-canvas"
+				aria-label="QR code used to measure camera position"
+			/>
 		</div>
 	);
 }

@@ -46,6 +46,7 @@ export function Display({ token: routeToken }: { token: string | null }) {
 	const origin = typeof window === "undefined" ? "" : window.location.origin;
 	const payload = useMemo(() => payloadForToken(origin, token), [origin, token]);
 	const url = `${origin}/s/${token}`;
+	const displayUrl = `${origin}/d/${token}`;
 
 	useEffect(() => {
 		if (routeToken) return;
@@ -216,7 +217,7 @@ export function Display({ token: routeToken }: { token: string | null }) {
 					onLayout={publishLayout}
 				/>
 				<div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] text-center font-mono text-[11px] tracking-wide text-black/55">
-					SPATIAL-QR · {layout ? Math.round(layout.symbolEdgeMm) : "—"} mm · hold still
+					SPATIAL QR · {layout ? Math.round(layout.symbolEdgeMm) : "—"} mm · hold still
 				</div>
 				{flash > 0 && (
 					<div
@@ -233,12 +234,11 @@ export function Display({ token: routeToken }: { token: string | null }) {
 		<main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-10 px-6 py-10">
 			<header className="flex flex-col items-center gap-5 text-center">
 				<h1 className="max-w-xl text-balance text-2xl leading-snug font-medium sm:text-3xl">
-					A QR code that can tell where you were standing when you scanned it.
+					Scan this code. The screen will show where your phone was.
 				</h1>
 				<p className="max-w-lg text-sm leading-relaxed text-[var(--hex-muted)]">
-					You are looking at a square. We know exactly how wide it is. Point your phone's camera
-					back at it, and the shape it makes in your photograph is enough to solve for where you
-					were.
+					The code&apos;s shape in your camera reveals its angle and distance. No depth sensor, AR
+					session or login.
 				</p>
 
 				<div className="relative" data-testid="marker-slot">
@@ -273,17 +273,17 @@ export function Display({ token: routeToken }: { token: string | null }) {
 							data-testid="handheld-notice"
 						>
 							<p className="max-w-[15rem] text-sm leading-snug text-[var(--hex-text)]">
-								This code is meant to be looked <em>at</em>, not looked <em>from</em>.
+								Open this display on a larger screen.
 							</p>
 							<p className="max-w-[16rem] text-xs leading-relaxed text-[var(--hex-muted)]">
-								Open this page on a laptop, monitor or TV, then scan it from here.
+								Then use this phone to scan it.
 							</p>
 							<button
 								type="button"
 								onClick={() => setShowAnyway(true)}
 								className="rounded border border-[var(--hex-line)] bg-[var(--hex-void)]/80 px-3 py-1.5 font-mono text-[11px] text-[var(--hex-muted)] backdrop-blur"
 							>
-								this device is the screen — show it
+								Use this device as the display
 							</button>
 						</div>
 					)}
@@ -296,25 +296,24 @@ export function Display({ token: routeToken }: { token: string | null }) {
 				</div>
 
 				<p className="font-mono text-xs text-[var(--hex-dim)]">
-					{dimmed ? "the address to open on the big screen:" : "or type it in:"}{" "}
+					{dimmed ? "Open on the larger screen:" : "Can't scan? Open this on your phone:"}{" "}
 					<span className="text-[var(--hex-muted)]" data-testid="scan-url">
-						{url.replace(/^https?:\/\//, "")}
+						{(dimmed ? displayUrl : url).replace(/^https?:\/\//, "")}
 					</span>
 				</p>
 				{dimmed ? (
 					<button
 						type="button"
 						onClick={() => {
-							void navigator.clipboard?.writeText(url).catch(() => {});
+							void navigator.clipboard?.writeText(displayUrl).catch(() => {});
 						}}
 						className="rounded border border-[var(--hex-line)] px-4 py-2 font-mono text-xs"
 					>
-						copy the address
+						Copy address
 					</button>
 				) : (
 					<p className="max-w-md text-xs text-[var(--hex-dim)]">
-						The code is plain on purpose. Rounded corners and a logo in the middle would cost us a
-						degree.
+						Scan from where you want the phone&apos;s position measured.
 					</p>
 				)}
 			</header>
@@ -332,7 +331,7 @@ export function Display({ token: routeToken }: { token: string | null }) {
 				</section>
 			)}
 
-			<Explainer range={range} moduleCount={moduleCount} version={version} />
+			<Explainer range={range} />
 
 			<footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--hex-line)] pt-5 text-xs text-[var(--hex-dim)]">
 				<button
@@ -340,10 +339,10 @@ export function Display({ token: routeToken }: { token: string | null }) {
 					onClick={() => navigate("/create")}
 					className="rounded border border-[var(--hex-line)] px-3 py-2 font-mono text-[var(--hex-text)] transition hover:border-[var(--hex-accent)]"
 				>
-					Make one for your own screen →
+					Make one for another screen →
 				</button>
 				<a className="font-mono underline hover:text-[var(--hex-muted)]" href="/how-it-works">
-					how it works, with the maths
+					How it works
 				</a>
 			</footer>
 		</main>
@@ -363,12 +362,12 @@ function LiveStrip({
 }) {
 	const message =
 		beat === "connected"
-			? "A phone just connected."
+			? "Phone connected."
 			: beat === "revealed"
-				? "Solved. That dot is where the camera was."
+				? "Solved. The dot marks the camera."
 				: viewerCount > 0
-					? `${viewerCount} ${viewerCount === 1 ? "person is" : "people are"} in this room.`
-					: "Nobody is standing here yet.";
+					? `${viewerCount} ${viewerCount === 1 ? "camera" : "cameras"} measured on this display.`
+					: "No scans yet.";
 
 	return (
 		<div
@@ -379,69 +378,81 @@ function LiveStrip({
 			<span className="text-[var(--hex-text)]">{message}</span>
 			<span className="text-[var(--hex-dim)]">
 				{/* Stated truthfully, including on day zero when it reads in single digits. */}
-				{ghostTotal.toLocaleString()} before you ·{" "}
-				<span data-testid="connection-state">{connection}</span>
+				{ghostTotal.toLocaleString()} past scans ·{" "}
+				<span data-testid="connection-state">{connectionLabel(connection)}</span>
 			</span>
 		</div>
 	);
 }
 
+function connectionLabel(connection: string): string {
+	if (connection === "offline") return "offline";
+	if (connection === "connecting") return "connecting";
+	return "live";
+}
+
 function Explainer({
 	range,
-	moduleCount,
-	version,
 }: {
 	range: { maxDistanceM: number; maxDistanceScreenHeights: number } | null;
-	moduleCount: number;
-	version: number;
 }) {
 	return (
 		<section className="flex flex-col gap-5 text-sm leading-relaxed text-[var(--hex-muted)]">
 			<h2 className="font-mono text-xs tracking-widest text-[var(--hex-dim)] uppercase">
-				What is this?
+				How the scan works
 			</h2>
-
-			<p>
-				<strong className="text-[var(--hex-text)]">The geometry.</strong> A square photographed
-				straight on looks square. Photographed from the side it looks like a trapezoid, and the
-				exact shape of that trapezoid depends on one thing: where the camera was. Solving backwards
-				from the shape to the position is a hundred-year-old piece of projective geometry.
-			</p>
-
-			<p>
-				<strong className="text-[var(--hex-text)]">Why we ask for a second look.</strong> The code
-				above only has to be big enough for your camera app to notice. When you tap the button on
-				your phone, this screen clears and the code fills it, with brackets in the corners. A bigger
-				square is a better measurement — and moving the screen is the only way to improve the
-				geometry without moving you, which would change the answer we are trying to find.
-			</p>
-
-			<p>
-				<strong className="text-[var(--hex-text)]">What leaves your phone.</strong> Four numbers:
-				two angles, a distance in screen-heights, and how sure we are. The photograph is decoded and
-				solved on your device and never uploaded. You see the four numbers before they are sent, and
-				the camera light goes out before anything is drawn.
-			</p>
-
-			<p>
-				<strong className="text-[var(--hex-text)]">How good is it, honestly.</strong> Angles land
-				within a degree or two. Distance comes as a ratio of screen-heights, which is exact because
-				it never involves a physical measurement — and then in metres, which needs two guesses (how
-				big your screen is, and your camera's focal length) and carries a visible error bar because
-				of it. We are also measuring your phone, not your eyes; those are about 40 cm apart, and
-				there is a toggle for it.
-			</p>
 
 			{range && (
 				<p className="rounded border border-[var(--hex-line)] px-4 py-3 font-mono text-xs text-[var(--hex-dim)]">
-					this display, this payload: version {version}, {moduleCount} modules · good to about{" "}
-					<span className="text-[var(--hex-text)]">
-						{range.maxDistanceScreenHeights.toFixed(1)} screen-heights
-					</span>{" "}
-					({range.maxDistanceM.toFixed(1)} m) at 1920px capture · computed, not remembered
+					<span className="text-[var(--hex-text)]">Estimated reliable range</span> ·{" "}
+					{range.maxDistanceM.toFixed(1)} m, or {range.maxDistanceScreenHeights.toFixed(1)} display
+					heights · assumes a 1920 px capture
 				</p>
 			)}
+
+			<div className="grid gap-4 sm:grid-cols-3">
+				<ExplainerStep number="1" title="Declared size">
+					This display reports the code&apos;s measured or estimated on-screen size.
+				</ExplainerStep>
+				<ExplainerStep number="2" title="Short capture">
+					The screen enlarges the code. Your phone rejects moving frames and chooses a stable one.
+				</ExplainerStep>
+				<ExplainerStep number="3" title="Camera position">
+					Perspective gives two angles and distance. The screen plots the result.
+				</ExplainerStep>
+			</div>
+
+			<p className="rounded border border-[var(--hex-line)] px-4 py-3">
+				<strong className="text-[var(--hex-text)]">The image stays on your phone.</strong> The
+				position and its uncertainty are sent. Solid results may also contribute coarse device data
+				and a focal estimate to pooled calibration. The camera switches off before the result
+				appears.
+			</p>
+
+			<p>
+				Direction is usually within 1–3°. Distance in display heights needs no physical-size guess;
+				metres do, so they come with an error bar. The dot marks the phone camera, with an optional
+				estimate for your eyes.
+			</p>
 		</section>
+	);
+}
+
+function ExplainerStep({
+	number,
+	title,
+	children,
+}: {
+	number: string;
+	title: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<div className="rounded border border-[var(--hex-line)] px-4 py-3">
+			<p className="mb-1 font-mono text-[11px] text-[var(--hex-accent)]">{number}</p>
+			<h3 className="mb-1 text-sm font-medium text-[var(--hex-text)]">{title}</h3>
+			<p className="text-xs leading-relaxed">{children}</p>
+		</div>
 	);
 }
 

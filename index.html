@@ -5,15 +5,15 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<meta name="color-scheme" content="dark" />
 		<meta name="theme-color" content="#08080a" />
-		<title>Spatial QR — a code that knows where you stood</title>
+		<title>Spatial QR — measure camera position from a QR code</title>
 		<meta
 			name="description"
-			content="Point your phone at a square whose width we know. The perspective distortion in that one photograph is enough to solve for where you were standing."
+			content="Scan a QR code of declared size to estimate your camera's angle and distance. The image is processed on your phone."
 		/>
-		<meta property="og:title" content="A QR code that knows where you stood" />
+		<meta property="og:title" content="A QR code that measures where its camera was" />
 		<meta
 			property="og:description"
-			content="One photograph, no depth sensor, no AR session, no login. Then the screen draws you standing in front of it."
+			content="No depth sensor, AR session, login or image upload. The display plots the camera's measured position."
 		/>
 		<meta property="og:type" content="website" />
 		<meta name="twitter:card" content="summary_large_image" />
@@ -22,8 +22,7 @@
 	<body>
 		<div id="root"></div>
 		<noscript>
-			This demo solves camera geometry in the browser, so it needs JavaScript. The maths is
-			written up at /how-it-works, which is readable without it.
+			This demo needs JavaScript to process camera geometry on your device.
 		</noscript>
 		<script type="module" src="/src/client/main.tsx"></script>
 	</body>

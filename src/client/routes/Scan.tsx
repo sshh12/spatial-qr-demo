@@ -48,6 +48,7 @@ type Stage =
 	| "solving"
 	| "result"
 	| "ambiguous"
+	| "retry"
 	| "no-camera"
 	| "blocked";
 
@@ -282,18 +283,16 @@ export function Scan({ token }: { token: string }) {
 		await new Promise((resolve) => setTimeout(resolve, reduced ? 0 : 700));
 
 		if (!outcome.chosen) {
-			setFailure(outcome.reasons[0] ?? "nothing usable in that capture");
-			setStage("aiming");
+			if (outcome.ambiguous) {
+				setSolved(outcome.ambiguous);
+				setStage("ambiguous");
+				return;
+			}
+			setFailure(friendlyCaptureFailure(outcome.reasons[0]));
+			setStage("retry");
 			return;
 		}
 		setSolved(outcome.chosen);
-
-		if (!outcome.chosen.ok) {
-			setStage(outcome.chosen.reason?.code === "ambiguous" ? "ambiguous" : "aiming");
-			setFailure(outcome.chosen.reason?.detail ?? null);
-			return;
-		}
-
 		setStage("result");
 	}, [token, activeLayout, reduced, stopAiming]);
 
@@ -329,7 +328,7 @@ export function Scan({ token }: { token: string }) {
 	if (!spec)
 		return (
 			<Shell>
-				<Fatal title="That link is not a display we know about." />
+				<Fatal title="Display not found" detail="This QR link is incomplete or invalid." />
 			</Shell>
 		);
 	if (support === "insecure" && stage === "cold") {
@@ -383,7 +382,6 @@ export function Scan({ token }: { token: string }) {
 					stage={stage}
 					progress={progress}
 					failure={failure}
-					detached={detached}
 					onCapture={onCapture}
 					video={videoRef.current}
 				/>
@@ -421,16 +419,21 @@ export function Scan({ token }: { token: string }) {
 				/>
 			)}
 
+			{stage === "retry" && (
+				<RetryCapture
+					reason={failure}
+					onRetry={() => {
+						setFailure(null);
+						setProgress(0);
+						void onEnableCamera();
+					}}
+				/>
+			)}
+
 			{stage === "blocked" && <BlockedByApp inApp={inApp} onCopy={() => copyLink()} />}
 
 			{stage === "no-camera" && displayContext && (
-				<NoCamera
-					token={token}
-					clientId={me.current}
-					ghosts={ghosts}
-					reason={failure}
-					displayHeight={activeLayout?.viewportCssPx.h ?? 1080}
-				/>
+				<NoCamera token={token} clientId={me.current} ghosts={ghosts} reason={failure} />
 			)}
 
 			{stage === "result" && solved?.primary && displayContext && (
@@ -473,7 +476,7 @@ function Fatal({ title, detail }: { title: string; detail?: string }) {
 			<h1 className="text-xl leading-snug font-medium">{title}</h1>
 			{detail && <p className="text-sm text-[var(--hex-muted)]">{detail}</p>}
 			<a className="font-mono text-xs text-[var(--hex-accent)] underline" href="/">
-				start again
+				Open the demo
 			</a>
 		</section>
 	);
@@ -501,32 +504,30 @@ function ColdOpen({
 	return (
 		<section className="flex min-h-[80vh] flex-col justify-center gap-8" data-testid="stage-cold">
 			<div className="flex flex-col gap-3">
-				<h1 className="text-2xl leading-snug font-medium">
-					You just scanned a square. We know exactly how wide it is.
-				</h1>
+				<h1 className="text-2xl leading-snug font-medium">This display can locate your phone.</h1>
 				<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
-					Take one photograph of it and we can work out where you are standing, from the shape it
-					makes in the picture.
+					A short camera capture measures the code&apos;s perspective, revealing your phone&apos;s
+					angle and distance from the screen.
 				</p>
 			</div>
 
 			<ul className="flex flex-col gap-2 font-mono text-xs text-[var(--hex-dim)]">
-				<li>One photograph.</li>
-				<li>Decoded on this phone.</li>
-				<li>Four numbers sent, and you&apos;ll see them first.</li>
+				<li>Camera starts only after you tap.</li>
+				<li>Images stay on this phone.</li>
+				<li>Position and uncertainty are sent.</li>
 			</ul>
 
 			{detached && (
 				<p className="rounded border border-[var(--hex-warn)]/40 px-4 py-3 text-xs text-[var(--hex-warn)]">
-					The screen you scanned isn&apos;t connected, so we&apos;ll work from the small code. That
-					shortens the useful range, and the error bar will show it.
+					The display is no longer connected. We&apos;ll measure from the smaller code you scanned,
+					so the usable range is shorter.
 				</p>
 			)}
 
 			{inApp.kind !== "none" && (
 				<p className="rounded border border-[var(--hex-warn)]/40 px-4 py-3 text-xs text-[var(--hex-warn)]">
-					You&apos;re inside {inApp.app}&apos;s built-in browser, which often refuses camera access
-					without asking. If it does, we&apos;ll show you how to get out.
+					Camera access sometimes fails inside {inApp.app}. If it does, we&apos;ll help you open
+					this page in Safari or Chrome.
 				</p>
 			)}
 
@@ -545,7 +546,7 @@ function ColdOpen({
 					onClick={onNoCamera}
 					className="text-center font-mono text-xs text-[var(--hex-dim)] underline"
 				>
-					I&apos;d rather not use my camera
+					Place me manually
 				</button>
 			</div>
 		</section>
@@ -568,11 +569,11 @@ function Permission({
 			data-testid="stage-permission"
 		>
 			<h2 className="text-xl leading-snug font-medium">
-				Your phone is about to ask for the camera.
+				Allow camera access for one short capture.
 			</h2>
 			<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
-				Frames are read on this device. Nothing is uploaded, and the camera is switched off the
-				instant the photograph is taken — you&apos;ll see the indicator go out.
+				Images are processed on this phone and never uploaded. The camera switches off as soon as
+				capture ends.
 			</p>
 			{inApp.kind !== "none" && (
 				<p className="font-mono text-xs text-[var(--hex-warn)]">
@@ -592,7 +593,7 @@ function Permission({
 				onClick={onNoCamera}
 				className="text-center font-mono text-xs text-[var(--hex-dim)] underline"
 			>
-				place myself on a plan instead
+				Place me manually
 			</button>
 		</section>
 	);
@@ -605,9 +606,11 @@ function LookUp({ detached }: { detached: boolean }) {
 			className="flex min-h-[80vh] flex-col items-center justify-center gap-4 text-center"
 			data-testid="stage-lookup"
 		>
-			<p className="text-2xl font-medium">Look up at the screen.</p>
+			<p className="text-2xl font-medium">Look back at the code.</p>
 			<p className="font-mono text-xs text-[var(--hex-dim)]">
-				{detached ? "working from the small code" : "it is making itself bigger for you"}
+				{detached
+					? "Point back at the code you scanned"
+					: "The code is expanding for a clearer measurement"}
 			</p>
 		</section>
 	);
@@ -619,7 +622,6 @@ function Viewfinder({
 	stage,
 	progress,
 	failure,
-	detached,
 	onCapture,
 	video,
 }: {
@@ -627,12 +629,11 @@ function Viewfinder({
 	stage: Stage;
 	progress: number;
 	failure: string | null;
-	detached: boolean;
 	onCapture: () => void;
 	video: HTMLVideoElement | null;
 }) {
 	const size = video ? { w: video.videoWidth, h: video.videoHeight } : { w: 1, h: 1 };
-	const gauge = gaugeMessage(aim, detached);
+	const gauge = gaugeMessage(aim);
 	const canCapture = Boolean(aim?.found) && gauge.ready && stage === "aiming";
 
 	return (
@@ -660,7 +661,9 @@ function Viewfinder({
 
 			<div className="mt-6 flex justify-center px-6">
 				<p className="rounded-full bg-black/60 px-4 py-2 font-mono text-xs text-white backdrop-blur">
-					{stage === "capturing" ? `holding still… ${Math.round(progress * 100)}%` : gauge.text}
+					{stage === "capturing"
+						? `Capturing… keep still · ${Math.round(progress * 100)}%`
+						: gauge.text}
 				</p>
 			</div>
 
@@ -676,7 +679,7 @@ function Viewfinder({
 					disabled={!canCapture}
 					data-testid="capture"
 					className="h-20 w-20 rounded-full border-4 border-white bg-white/25 backdrop-blur transition disabled:opacity-30"
-					aria-label="Take the photograph"
+					aria-label="Capture the code"
 				/>
 			</div>
 		</div>
@@ -689,15 +692,14 @@ function Viewfinder({
  * Never an instruction to move sideways. The angle *is* the measurement: asking
  * somebody to step left would change the answer we are trying to report.
  */
-function gaugeMessage(aim: AimResult | null, detached: boolean): { text: string; ready: boolean } {
-	if (!aim?.found) return { text: "point at the screen", ready: false };
-	if (aim.touchesBorder)
-		return { text: "the code runs off the edge — step back a little", ready: false };
-	if (aim.pxPerModule < 3.5) return { text: "too far away to read it properly", ready: false };
+function gaugeMessage(aim: AimResult | null): { text: string; ready: boolean } {
+	if (!aim?.found) return { text: "Point at the code", ready: false };
+	if (aim.touchesBorder) return { text: "Step back until the whole code fits", ready: false };
+	if (aim.pxPerModule < 3.5) return { text: "Move closer — the code is too small", ready: false };
 	if (aim.pxPerModule < 6) {
-		return { text: detached ? "closer would help" : "closer would help", ready: true };
+		return { text: "Ready — move closer for better accuracy", ready: true };
 	}
-	return { text: "hold still", ready: true };
+	return { text: "Hold still and tap the shutter", ready: true };
 }
 
 /** S5: watch the maths agree with the photograph. */
@@ -723,7 +725,7 @@ function Solving({ frozen, solved }: { frozen: HTMLCanvasElement; solved: SolveR
 						viewBox={`0 0 ${frozen.width} ${frozen.height}`}
 						role="img"
 					>
-						<title>The reprojected model square, drawn over the photograph it came from</title>
+						<title>Measured square projected over the captured image</title>
 						<polygon
 							points={solved.reprojected.map((p) => `${p.x},${p.y}`).join(" ")}
 							fill="none"
@@ -734,8 +736,26 @@ function Solving({ frozen, solved }: { frozen: HTMLCanvasElement; solved: SolveR
 				)}
 			</div>
 			<p className="text-center font-mono text-xs text-[var(--hex-dim)]">
-				camera off · solving from the frozen frame
+				Camera off · checking this frame on your phone
 			</p>
+		</section>
+	);
+}
+
+function RetryCapture({ reason, onRetry }: { reason: string | null; onRetry: () => void }) {
+	return (
+		<section className="flex min-h-[80vh] flex-col justify-center gap-5" data-testid="stage-retry">
+			<h2 className="text-xl leading-snug font-medium">That capture was not clear enough.</h2>
+			<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
+				{reason ?? "Keep the whole code in frame and hold the phone still."}
+			</p>
+			<button
+				type="button"
+				onClick={onRetry}
+				className="rounded bg-[var(--hex-accent)] px-5 py-3 font-mono text-sm text-black"
+			>
+				Try again
+			</button>
 		</section>
 	);
 }
@@ -749,24 +769,21 @@ function Ambiguous({ solved, onRetry }: { solved: SolveResult; onRetry: () => vo
 			className="flex min-h-[80vh] flex-col justify-center gap-6"
 			data-testid="stage-ambiguous"
 		>
-			<h2 className="text-xl leading-snug font-medium">Two answers fit this photograph.</h2>
+			<h2 className="text-xl leading-snug font-medium">Two positions fit this capture.</h2>
 			<PlanView viewers={[]} ambiguousPair={{ az, dh }} showLegend={false} />
 			<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
-				One on each side of the screen, and the picture honestly can&apos;t tell them apart. That is
-				a known property of measuring a flat square from one viewpoint, not a bug we can fix from
-				here.
+				The geometry cannot yet tell which side of the screen you were on.
 			</p>
 			<p className="text-sm text-[var(--hex-text)]">
-				Take one step <strong>to your right</strong> and photograph it again. A step in a known
-				direction breaks the tie outright — stepping either way would not, because flipping both
-				photographs flips the step with them.
+				Take one step <strong>to your right</strong>, then scan again. A known direction breaks the
+				tie.
 			</p>
 			<button
 				type="button"
 				onClick={onRetry}
 				className="rounded bg-[var(--hex-accent)] px-5 py-3 font-mono text-sm text-black"
 			>
-				I&apos;ve stepped right — go again
+				I stepped right — scan again
 			</button>
 		</section>
 	);
@@ -788,8 +805,9 @@ function BlockedByApp({
 				{appName(inApp)} blocked the camera without asking you.
 			</h2>
 			<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
-				That was the app, not your phone&apos;s settings, so checking your privacy settings
-				won&apos;t help. Open this link in your normal browser instead.
+				{inApp.kind === "none"
+					? "Open this link in your normal browser. Changing your phone's privacy settings will not override an embedded browser."
+					: `Open this link in your normal browser. Changing your phone's privacy settings will not override the browser built into ${inApp.app}.`}
 			</p>
 			{inApp.kind === "android-webview" ? (
 				<a
@@ -810,12 +828,8 @@ function BlockedByApp({
 				onClick={onCopy}
 				className="rounded border border-[var(--hex-line)] px-5 py-3 font-mono text-sm"
 			>
-				Copy the link
+				Copy link
 			</button>
-			<p className="font-mono text-[11px] text-[var(--hex-dim)]">
-				We deliberately do not bounce you through a Shortcut to work around this. Sending a
-				security-conscious person through a fake shortcut is the opposite of the point.
-			</p>
 		</section>
 	);
 }
@@ -827,22 +841,18 @@ function FarblingNotice({ onContinue }: { onContinue: () => void }) {
 			data-testid="stage-farbling"
 		>
 			<h2 className="text-xl leading-snug font-medium">
-				Your browser is protecting you in a way that breaks this.
+				Image protection prevents an accurate reading.
 			</h2>
 			<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
-				Brave and some privacy extensions add tiny random changes to any image read back from a
-				canvas, to stop fingerprinting. It&apos;s good protection, and this demo reads camera frames
-				exactly that way, so its measurement would be quietly wrong rather than obviously broken.
-			</p>
-			<p className="text-sm text-[var(--hex-muted)]">
-				We&apos;d rather tell you than show you a confident wrong answer.
+				Brave and some privacy extensions slightly alter images read by the browser. This demo reads
+				camera frames the same way, so its result would be unreliable.
 			</p>
 			<button
 				type="button"
 				onClick={onContinue}
 				className="rounded bg-[var(--hex-accent)] px-5 py-3 font-mono text-sm text-black"
 			>
-				Place myself on a plan instead
+				Place me manually
 			</button>
 		</section>
 	);
@@ -854,13 +864,11 @@ function NoCamera({
 	clientId: id,
 	ghosts,
 	reason,
-	displayHeight,
 }: {
 	token: string;
 	clientId: string;
 	ghosts: readonly Ghost[];
 	reason: string | null;
-	displayHeight: number;
 }) {
 	const [az, setAz] = useState(-18);
 	const [dh, setDh] = useState(2.4);
@@ -884,19 +892,15 @@ function NoCamera({
 		>
 			<h2 className="text-xl leading-snug font-medium">Put yourself on the plan.</h2>
 			<p className="text-sm leading-relaxed text-[var(--hex-muted)]">
-				{reason === "no-camera-api"
-					? "This browser doesn't offer a camera API at all, so there is nothing to ask for. "
-					: reason === "denied"
-						? "No camera, no problem — "
-						: ""}
-				Drag the two sliders until the dot is roughly where you are. You&apos;ll join the same room
-				and the same scene as everybody who used their camera.
+				{reason === "no-camera-api" ? "This browser cannot access a camera. " : ""}
+				Drag the controls until the dot is roughly where you are. Your position will be added to
+				this scan.
 			</p>
 
 			<PlanView viewers={[viewer]} ghosts={ghosts} meId={id} />
 
 			<label className="flex flex-col gap-2 font-mono text-xs text-[var(--hex-dim)]">
-				angle: {formatSigned(az)}° {az < -2 ? "left" : az > 2 ? "right" : "centre"}
+				Side-to-side angle: {formatSigned(az)}° {az < -2 ? "left" : az > 2 ? "right" : "centre"}
 				<input
 					type="range"
 					min={-70}
@@ -904,11 +908,11 @@ function NoCamera({
 					value={az}
 					onChange={(e) => setAz(Number(e.target.value))}
 					className="accent-[var(--hex-accent)]"
-					aria-label="angle from the centre of the screen"
+					aria-label="Angle left or right of screen centre"
 				/>
 			</label>
 			<label className="flex flex-col gap-2 font-mono text-xs text-[var(--hex-dim)]">
-				distance: {dh.toFixed(1)} screen-heights
+				Distance from the screen: {dh.toFixed(1)} display heights
 				<input
 					type="range"
 					min={0.5}
@@ -917,7 +921,7 @@ function NoCamera({
 					value={dh}
 					onChange={(e) => setDh(Number(e.target.value))}
 					className="accent-[var(--hex-accent)]"
-					aria-label="distance in screen heights"
+					aria-label="Distance from screen in display heights"
 				/>
 			</label>
 
@@ -932,11 +936,10 @@ function NoCamera({
 				}}
 				className="rounded bg-[var(--hex-accent)] px-5 py-3 font-mono text-sm text-black disabled:opacity-40"
 			>
-				{sent ? "you're in the room" : "That's where I am"}
+				{sent ? "Position added" : "Add my position"}
 			</button>
 			<p className="font-mono text-[11px] text-[var(--hex-dim)]">
-				placed by hand · not counted in the measurements · display height{" "}
-				{Math.round(displayHeight)}px
+				placed by hand · excluded from measured results
 			</p>
 		</section>
 	);
@@ -979,11 +982,23 @@ function Result({
 
 	return (
 		<section className="flex flex-col gap-7 pb-16" data-testid="stage-result">
+			<div className="flex flex-col gap-2">
+				<h2 className="text-xl leading-snug font-medium" data-testid="verdict">
+					Your phone was {describe(r)}.
+				</h2>
+				<p className="font-mono text-xs text-[var(--hex-dim)]">
+					{solved.tier === "solid"
+						? "High confidence"
+						: "Lower confidence · wider uncertainty area"}{" "}
+					· {solved.pointCount} reference points
+				</p>
+			</div>
+
 			<div className="h-[52vh] min-h-64 overflow-hidden rounded border border-[var(--hex-line)]">
 				<Suspense
 					fallback={
 						<div className="flex h-full items-center justify-center font-mono text-xs text-[var(--hex-dim)]">
-							building the room…
+							Loading 3D view…
 						</div>
 					}
 				>
@@ -1001,36 +1016,26 @@ function Result({
 				</Suspense>
 			</div>
 
-			<div className="flex flex-col gap-2">
-				<h2 className="text-xl leading-snug font-medium" data-testid="verdict">
-					You were {describe(r)}.
-				</h2>
-				<p className="font-mono text-xs text-[var(--hex-dim)]">
-					{solved.tier === "solid" ? "solid" : "soft — the ellipse is wider for a reason"} ·{" "}
-					{solved.pointCount} corners · {solved.bracketCount} brackets
-				</p>
-			</div>
-
 			<dl className="grid grid-cols-2 gap-4 font-mono text-xs">
 				<Stat
-					label="bearing"
+					label="side-to-side angle"
 					value={`${formatSigned(r.azimuthDeg, 1)}°`}
 					note={`± ${r.azimuthSigmaDeg.toFixed(1)}° · ${r.side}`}
 				/>
 				<Stat
-					label="elevation"
+					label="vertical angle"
 					value={`${formatSigned(r.elevationDeg, 1)}°`}
 					note={`± ${r.elevationSigmaDeg.toFixed(1)}°`}
 				/>
 				<Stat
-					label="distance"
+					label="display heights"
 					value={`${(eyes ? r.eyes.screenHeights : r.screenHeights).toFixed(2)} h`}
-					note={`± ${r.screenHeightsSigma.toFixed(2)} ${r.dimensionlessUnit} · exact, no physical units`}
+					note={`± ${r.screenHeightsSigma.toFixed(2)} ${r.dimensionlessUnit} · no physical scale needed`}
 				/>
 				<Stat
-					label="in metres"
+					label="estimated distance"
 					value={`${(eyes ? r.eyes.metres : r.metres).toFixed(2)} m`}
-					note={`± ${r.metresSigma.toFixed(2)} · needs two guesses`}
+					note={`± ${r.metresSigma.toFixed(2)} · uses estimated screen and camera data`}
 				/>
 			</dl>
 
@@ -1040,21 +1045,20 @@ function Result({
 				data-testid="eyes-toggle"
 				className="self-start rounded border border-[var(--hex-line)] px-4 py-2 font-mono text-xs"
 			>
-				showing: {eyes ? "your eyes (estimated)" : "your phone (measured)"} — switch
+				{eyes ? "Show measured phone position" : "Show estimated eye position"}
 			</button>
 
 			<p className="text-xs leading-relaxed text-[var(--hex-dim)]">
-				We measured the camera. Your eyes are roughly 40 cm behind it and 25 cm above it, which at
-				this distance is a bigger correction than everything else on this page put together.
+				We measure the camera, not your body. Eye position is estimated 40 cm behind and 25 cm above
+				the phone.
 			</p>
 
 			<PlanView viewers={viewers} ghosts={ghosts} meId={meId} />
 
 			{detached && (
 				<p className="rounded border border-[var(--hex-warn)]/40 px-4 py-3 text-xs text-[var(--hex-warn)]">
-					No display was connected, so this used the code&apos;s declared size. Angles are
-					unaffected by that — they are unaffected by size errors of any magnitude — but the metric
-					distance leans on it.
+					The display was offline, so distance in metres uses the size stored in the QR code. Angles
+					do not depend on that size.
 				</p>
 			)}
 
@@ -1064,25 +1068,24 @@ function Result({
 					onClick={onScreenshot}
 					className="self-start font-mono text-xs text-[var(--hex-accent)] underline"
 				>
-					share this
+					Create a share card
 				</button>
 			)}
 			{screenshot && (
 				<p className="rounded border border-[var(--hex-line)] px-4 py-3 text-xs text-[var(--hex-muted)]">
-					Sharing uploads the diagram above so it shows as a preview when you post it. It does not
-					upload your photograph.
+					The share card includes the diagram, not your photo.
 					<br />
 					<a
 						className="text-[var(--hex-accent)] underline"
 						href={`/og/${location.pathname.split("/").pop()}.svg`}
 					>
-						open the card
+						Open share card
 					</a>
 				</p>
 			)}
 
 			<a className="font-mono text-xs text-[var(--hex-accent)] underline" href="/how-it-works">
-				how this was calculated →
+				How this was calculated →
 			</a>
 		</section>
 	);
@@ -1117,16 +1120,16 @@ function Readout({
 	camera: { width: number; height: number } | null;
 	detached: boolean;
 }) {
+	const debug = new URLSearchParams(window.location.search).has("debug");
+	if (!debug) return null;
+	if (!["aiming", "capturing", "solving", "result", "ambiguous"].includes(stage)) return null;
+
 	const parts = [
-		camera ? `${camera.width}×${camera.height}` : "no camera",
-		aim?.found ? `${aim.pxPerModule.toFixed(1)} px/mod` : "no symbol",
-		solved ? `${solved.pointCount} pts` : null,
-		solved ? `rms ${solved.rmsPx.toFixed(2)}px` : null,
-		solved?.primary ? `f ${solved.primary.focalPx.toFixed(0)}` : null,
-		solved
-			? `margin ${Number.isFinite(solved.branchMargin) ? solved.branchMargin.toFixed(1) : "∞"}`
-			: null,
-		detached ? "detached" : "linked",
+		camera ? `camera ${camera.width}×${camera.height}` : null,
+		aim?.found ? `code ${aim.pxPerModule.toFixed(1)} px/module` : null,
+		solved ? `${solved.pointCount} reference points` : null,
+		solved ? `model fit ${solved.rmsPx.toFixed(2)} px` : null,
+		detached ? "display offline" : "display connected",
 	].filter(Boolean);
 
 	return (
@@ -1142,6 +1145,20 @@ function Readout({
 
 function copyLink(): void {
 	void navigator.clipboard?.writeText(window.location.href).catch(() => {});
+}
+
+function friendlyCaptureFailure(detail?: string): string {
+	if (!detail) return "Keep the whole code in frame and hold the phone still.";
+	if (/correspondence|hidden|blur/i.test(detail)) {
+		return "The code was hidden or blurred. Keep it in frame, hold still, and try again.";
+	}
+	if (/px\/module|outside|distance|small/i.test(detail)) {
+		return "The code was too small in the capture. Move closer and try again.";
+	}
+	if (/behind|reflection|mirrored/i.test(detail)) {
+		return "This may be a reflection. Point the camera at the display itself.";
+	}
+	return "The geometry was not reliable enough. Hold still and try again.";
 }
 
 function intentUrl(): string {

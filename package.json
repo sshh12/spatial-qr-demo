@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
-	"description": "A QR code that can tell where you were standing when you scanned it.",
+	"description": "Estimate camera position from a QR code shown at a known size.",
 	"license": "MIT",
 	"engines": {
 		"node": ">=24"

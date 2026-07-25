@@ -560,11 +560,11 @@ function shareCard(token: string, viewers: Viewer[], label: string | null): stri
 		.join("");
 
 	const headline =
-		viewers.length === 1 ? "1 person stood here" : `${viewers.length} people stood here`;
+		viewers.length === 1 ? "1 camera position" : `${viewers.length} camera positions`;
 
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
 <rect width="${W}" height="${H}" fill="#08080a"/>
-<text x="64" y="92" fill="#f4f4f6" font-size="42">A QR code that knows where you stood</text>
+<text x="64" y="92" fill="#f4f4f6" font-size="42">Camera positions measured from a QR code</text>
 <text x="64" y="136" fill="#8a8a94" font-size="21">${escapeXml(label ?? "spatial-qr")} &#183; ${escapeXml(headline)}</text>
 <rect x="${cx - H * 0.16}" y="${cy - 16}" width="${H * 0.32}" height="9" rx="3" fill="#e8e8ea"/>
 <text x="${cx}" y="${cy - 28}" fill="#8a8a94" font-size="15" text-anchor="middle">the display</text>

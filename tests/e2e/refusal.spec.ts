@@ -52,7 +52,7 @@ test.describe("refusals", () => {
 		// screen" is the honest message when nothing decoded at all, which is what
 		// twenty-six marker-widths away actually looks like.
 		const text = (await message.innerText()).toLowerCase();
-		expect(text).toMatch(/point at the screen|too far|closer|edge/);
+		expect(text).toMatch(/point at the code|move closer|whole code/i);
 	});
 
 	test("rejects a token that is not a display", async ({ page }) => {

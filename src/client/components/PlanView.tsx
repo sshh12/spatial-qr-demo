@@ -58,10 +58,14 @@ export function PlanView({
 			viewBox={`0 0 ${W} ${H}`}
 			className={`w-full ${className}`}
 			role="img"
-			aria-label={`Plan view with ${viewers.length} ${viewers.length === 1 ? "person" : "people"}`}
+			aria-label={
+				ambiguousPair
+					? "Top-down view of two possible camera positions, with the display at the top"
+					: `Top-down view of ${viewers.length} measured ${viewers.length === 1 ? "position" : "positions"}, with the display at the top`
+			}
 			data-testid="plan-view"
 		>
-			<title>Where people stood, seen from above</title>
+			<title>Camera positions viewed from above</title>
 			<defs>
 				<clipPath id={clipId}>
 					<rect x="0" y={originY - 12} width={W} height={H - originY + 12} />
@@ -212,7 +216,7 @@ export function PlanView({
 
 			{showLegend && (
 				<text x={16} y={H - 14} fill="var(--hex-dim)" fontSize={11} fontFamily="var(--font-mono)">
-					distance in display heights · rings every {rings[1] ? rings[1] - rings[0]! : 1}
+					h = display height · ring spacing {rings[1] ? rings[1] - rings[0]! : 1}h
 				</text>
 			)}
 		</svg>
