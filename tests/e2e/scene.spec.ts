@@ -19,7 +19,11 @@ const TOKEN = manifest.find((m) => m.name === "nominal")!.token;
  */
 test.describe("the scene", () => {
 	test.beforeEach(async ({ page }) => {
-		await page.goto(`/s/${TOKEN}`);
+		// `?debug=1` because the readout is opt-in: it is a diagnostic strip, not
+		// something to show a visitor who came to see where they were standing.
+		// Without the flag it renders nothing at all, and the assertion below
+		// waits ninety seconds for an element that was never going to exist.
+		await page.goto(`/s/${TOKEN}?debug=1`);
 		await page.getByTestId("begin").click({ timeout: 30_000 });
 		await page.getByTestId("enable-camera").click();
 		await page.getByTestId("capture").click({ timeout: 25_000 });

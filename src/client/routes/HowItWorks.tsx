@@ -136,14 +136,18 @@ export function HowItWorks() {
 			<Section title="One frame can fit two positions">
 				<MirrorDiagram />
 				<p>
-					A flat square can produce two mirror-image camera positions. They have the same distance,
-					but opposite horizontal and vertical angles. Gravity cannot choose between them because
-					both candidates have the same orientation relative to gravity.
+					A flat square can produce two mirror-image camera positions. They sit at the same distance
+					on opposite sides of the screen, with opposite horizontal and vertical angles.
 				</p>
 				<p>
-					The solver compares how well both positions fit every measured point. If the evidence is
-					too close, the app asks for another scan after one step to the right. The known direction
-					breaks the tie.
+					The phone&apos;s tilt sensor cannot tell them apart. The two candidates are mirrored
+					through a vertical plane, so the screen faces the same way relative to level in both, and
+					knowing which way is down says nothing about which side of the room you are on.
+				</p>
+				<p>
+					So the solver compares how well each position fits every measured point instead. If the
+					evidence is too close to call, the app asks for another scan after one step to the right.
+					That step is a direction it already knows, and it breaks the tie.
 				</p>
 			</Section>
 
@@ -273,13 +277,6 @@ export function HowItWorks() {
 					)}
 				</TechnicalNote>
 			</section>
-
-			<footer className="border-t border-[var(--hex-line)] pt-6 text-[var(--hex-text)]">
-				<p>
-					Angles are the stronger measurement. Metres are an estimate with an error bar. If a tape
-					measure lands outside that bar, please open an issue.
-				</p>
-			</footer>
 		</main>
 	);
 }

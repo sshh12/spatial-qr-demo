@@ -136,7 +136,29 @@ export function describe(readout: Readout): string {
 		readout.side === "centre"
 			? "straight in front of"
 			: `${Math.abs(readout.azimuthDeg).toFixed(0)}° to the ${readout.side} of`;
-	return `${readout.screenHeights.toFixed(1)} ${readout.dimensionlessUnit} back, ${side} the screen`;
+	const metric = approximateMetres(readout.metres);
+	return `${readout.screenHeights.toFixed(1)} ${readout.dimensionlessUnit} back${
+		metric ? ` (about ${metric})` : ""
+	}, ${side} the screen`;
+}
+
+/**
+ * The distance a person actually came for, in brackets, hedged.
+ *
+ * The exact figure still leads the sentence: it is a ratio of two lengths in
+ * the same pixels, so nothing anyone guessed enters into it. But nobody can
+ * picture "2.4 display heights", and the number they could check with a tape
+ * measure is the one that makes the result feel true -- so it belongs in the
+ * headline rather than only in the stats. "About" is doing real work: this
+ * figure inherits the display's physical size and the camera's focal length,
+ * both estimated. The ± bar stays a few lines below, where there is room to
+ * state it properly.
+ */
+export function approximateMetres(metres: number): string | null {
+	if (!Number.isFinite(metres) || metres <= 0) return null;
+	// Centimetres below a metre, because "0.4 m" is a figure nobody says aloud.
+	if (metres < 1) return `${Math.round(metres * 100)} cm`;
+	return `${metres.toFixed(1)} m`;
 }
 
 /** The default assumption when nobody has run the card ruler. */

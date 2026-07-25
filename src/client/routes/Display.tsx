@@ -15,6 +15,11 @@ import { useHandheld } from "../lib/viewport.ts";
 
 type Beat = "idle" | "connected" | "swapped" | "captured" | "revealed";
 
+/** How long the screen stays full-bleed with nobody having pressed the shutter. */
+const AIM_TIMEOUT_MS = 120_000;
+/** And how long it waits for a result after one has. */
+const SOLVE_TIMEOUT_MS = 20_000;
+
 /**
  * The display page, which stops being a page and becomes the instrument.
  *
@@ -165,6 +170,7 @@ export function Display({ token: routeToken }: { token: string | null }) {
 			case "phone-armed":
 				// Beat 2: the swap. Everything else fades, the marker goes full-bleed,
 				// and four brackets snap to the display's true corners.
+				setFlash(0);
 				setBeat("swapped");
 				break;
 			case "capturing":
@@ -181,6 +187,29 @@ export function Display({ token: routeToken }: { token: string | null }) {
 				break;
 		}
 	}, [lastEvent]);
+
+	/**
+	 * The swap is not allowed to strand the screen.
+	 *
+	 * Full bleed is entered on a phone's say-so and left on the pose that follows
+	 * it -- and a pose is precisely what does not arrive when the solver refuses,
+	 * when the phone is closed mid-aim, or when the connection drops between the
+	 * two. Each of those leaves a white rectangle with no way out short of a
+	 * reload, on the one screen in the room everybody is looking at. So the exit
+	 * is timed as well as evented: generous while somebody is still walking back
+	 * and aiming, short once the shutter has gone, because by then the answer is
+	 * a few seconds away or it is not coming at all.
+	 */
+	useEffect(() => {
+		if (beat !== "swapped" && beat !== "captured") return;
+		// The shutter count decides which clock runs, rather than the beat. It is
+		// reset when the swap begins, so `flash > 0` means precisely "a photograph
+		// has been taken during *this* measurement" -- which also restarts the
+		// wait when somebody captures a second time after a refusal, instead of
+		// leaving them the remainder of the first attempt's.
+		const timer = setTimeout(() => setBeat("idle"), flash > 0 ? SOLVE_TIMEOUT_MS : AIM_TIMEOUT_MS);
+		return () => clearTimeout(timer);
+	}, [beat, flash]);
 
 	useEffect(
 		() => () => {

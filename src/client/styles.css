@@ -135,6 +135,17 @@ body {
 	animation: sqr-pulse 900ms ease-in-out;
 }
 .sqr-flash {
+	/*
+	 * The resting value, and it is load-bearing.
+	 *
+	 * There is no fill mode here, so the instant the 90ms animation ends the
+	 * element falls back to whatever it declares -- and an undeclared opacity is
+	 * 1, not 0. This element is a full-bleed white sheet above the marker, so
+	 * without this line the shutter finishes by covering the code, the corner
+	 * brackets and the caption in solid white, and leaves them covered until the
+	 * pose arrives. On a refusal no pose ever arrives.
+	 */
+	opacity: 0;
 	animation: sqr-flash 90ms linear;
 }
 .sqr-fade-up {

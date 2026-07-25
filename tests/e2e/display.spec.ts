@@ -107,7 +107,20 @@ test.describe("display", () => {
 
 		// The shutter beat.
 		await phone.request.post(`/api/s/${token}/capturing`, { data: {} });
-		await expect(page.getByTestId("shutter-flash")).toBeAttached({ timeout: 10_000 });
+		const shutter = page.getByTestId("shutter-flash");
+		await expect(shutter).toBeAttached({ timeout: 10_000 });
+
+		// And the shutter must give the screen back when it ends.
+		//
+		// The flash carries no fill mode, so the moment its animation finishes the
+		// element reverts to its own declared opacity -- and an undeclared opacity
+		// is 1, not 0. This is a full-bleed white sheet stacked above the marker,
+		// so getting that wrong leaves the display blank until a pose arrives, and
+		// on a refusal no pose ever does. It is invisible in a screenshot taken
+		// during the animation, which is exactly why it is asserted after it.
+		await shutter.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+		expect(await shutter.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
+		await expect(fullbleed.locator("canvas")).toBeVisible();
 
 		await phone.close();
 	});
