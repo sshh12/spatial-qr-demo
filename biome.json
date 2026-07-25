@@ -1,0 +1,47 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	"files": {
+		"includes": [
+			"**",
+			"!dist/",
+			"!node_modules/",
+			"!test-results/",
+			"!playwright-report/",
+			"!public/generated",
+			"!.playwright/",
+			"!tests/e2e/fixtures/",
+			"!src/client/styles.css",
+			"!**/*.svg"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 100
+	},
+	"javascript": {
+		"formatter": { "quoteStyle": "double", "semicolons": "always" }
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"style": {
+				"noNonNullAssertion": "off",
+				"useNamingConvention": "off",
+				"noParameterAssign": "off"
+			},
+			"suspicious": {
+				"noExplicitAny": "warn",
+				"noArrayIndexKey": "off"
+			},
+			"performance": {
+				"noNamespaceImport": "off"
+			},
+			"complexity": {
+				"noExcessiveCognitiveComplexity": "off"
+			}
+		}
+	}
+}

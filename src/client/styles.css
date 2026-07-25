@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+/*
+ * One palette, two encodings.
+ *
+ * Tailwind v4 wants OKLCH in `@theme`. three.js cannot read it: `Color.setStyle`
+ * does not parse `oklch()`, and an unregistered custom property comes back from
+ * getComputedStyle as the authored string rather than a resolved colour, so
+ * reading the OKLCH token and handing it to three gives you black.
+ *
+ * So every token that the 3D scene needs is mirrored as an sRGB hex custom
+ * property directly below its OKLCH twin. They are checked against each other in
+ * tests/unit/palette.test.ts, which converts the OKLCH to sRGB and fails if the
+ * pair has drifted -- otherwise "keep these in sync" is just a comment that
+ * stops being true.
+ */
+
+@theme {
+	/* Derived from the hex mirrors below, not eyeballed. See palette.test.ts. */
+	--color-void: oklch(0.1354 0.0047 285.8);
+	--color-surface: oklch(0.1886 0.008 285.6);
+	--color-line: oklch(0.2879 0.0127 285.6);
+	--color-dim: oklch(0.5455 0.0169 285.8);
+	--color-muted: oklch(0.6894 0.0145 286);
+	--color-text: oklch(0.9497 0.0027 286.3);
+	--color-accent: oklch(0.7824 0.1213 222.5);
+	--color-warn: oklch(0.8015 0.1513 78.9);
+	--color-danger: oklch(0.6476 0.2042 11.1);
+	--color-good: oklch(0.7967 0.1468 159.1);
+
+	--font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+	--font-sans:
+		ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root {
+	--hex-void: #08080a;
+	--hex-surface: #131317;
+	--hex-line: #2a2a31;
+	--hex-dim: #6f6f7a;
+	--hex-muted: #9a9aa4;
+	--hex-text: #eeeef0;
+	--hex-accent: #4cc9f0;
+	--hex-warn: #f2b134;
+	--hex-danger: #ef476f;
+	--hex-good: #57d99a;
+
+	color-scheme: dark;
+	--sqr-swap-ms: 600ms;
+}
+
+html,
+body {
+	height: 100%;
+	background: var(--hex-void);
+	color: var(--hex-text);
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	overscroll-behavior-y: none;
+}
+
+#root {
+	min-height: 100%;
+}
+
+/*
+ * The marker itself. Integer device pixels per module, no smoothing, and no
+ * transform anywhere in the ancestor chain -- an anti-aliased module edge
+ * degrades the sub-pixel refinement that every downstream number depends on.
+ */
+.marker-canvas {
+	/* Fallback first, preferred value last: `pixelated` is the one that must win. */
+	image-rendering: crisp-edges;
+	image-rendering: pixelated;
+	display: block;
+	background: #fff;
+}
+
+.tabular {
+	font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
+}
+
+@keyframes sqr-pulse {
+	0% {
+		opacity: 0;
+		transform: translateY(-100%);
+	}
+	40% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+		transform: translateY(100%);
+	}
+}
+
+@keyframes sqr-flash {
+	0% {
+		opacity: 0;
+	}
+	18% {
+		opacity: 0.08;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+@keyframes sqr-fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.sqr-pulse {
+	animation: sqr-pulse 900ms ease-in-out;
+}
+.sqr-flash {
+	animation: sqr-flash 90ms linear;
+}
+.sqr-fade-up {
+	animation: sqr-fade-up 420ms ease-out both;
+}

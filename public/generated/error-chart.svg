@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="460" viewBox="0 0 880 460" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+<rect width="880" height="460" fill="#0a0a0c"/>
+<text x="74" y="28" fill="#e8e8ea" font-size="15">What degrades first as the marker gets smaller in frame</text>
+<line x1="74" y1="398.0" x2="806.0" y2="398.0" stroke="#26262b" stroke-width="1"/>
+<text x="66" y="402.0" fill="#8a8a94" font-size="11" text-anchor="end">0.075</text>
+<line x1="74" y1="328.8" x2="806.0" y2="328.8" stroke="#26262b" stroke-width="1"/>
+<text x="66" y="332.8" fill="#8a8a94" font-size="11" text-anchor="end">0.14</text>
+<line x1="74" y1="259.6" x2="806.0" y2="259.6" stroke="#26262b" stroke-width="1"/>
+<text x="66" y="263.6" fill="#8a8a94" font-size="11" text-anchor="end">0.26</text>
+<line x1="74" y1="190.4" x2="806.0" y2="190.4" stroke="#26262b" stroke-width="1"/>
+<text x="66" y="194.4" fill="#8a8a94" font-size="11" text-anchor="end">0.49</text>
+<line x1="74" y1="121.2" x2="806.0" y2="121.2" stroke="#26262b" stroke-width="1"/>
+<text x="66" y="125.2" fill="#8a8a94" font-size="11" text-anchor="end">0.91</text>
+<line x1="74" y1="52.0" x2="806.0" y2="52.0" stroke="#26262b" stroke-width="1"/>
+<text x="66" y="56.0" fill="#8a8a94" font-size="11" text-anchor="end">1.69</text>
+<line x1="74.0" y1="52" x2="74.0" y2="398" stroke="#1c1c20" stroke-width="1"/>
+<text x="74.0" y="418" fill="#8a8a94" font-size="11" text-anchor="middle">3.03</text>
+<line x1="196.0" y1="52" x2="196.0" y2="398" stroke="#1c1c20" stroke-width="1"/>
+<text x="196.0" y="418" fill="#8a8a94" font-size="11" text-anchor="middle">4.07</text>
+<line x1="318.0" y1="52" x2="318.0" y2="398" stroke="#1c1c20" stroke-width="1"/>
+<text x="318.0" y="418" fill="#8a8a94" font-size="11" text-anchor="middle">5.48</text>
+<line x1="440.0" y1="52" x2="440.0" y2="398" stroke="#1c1c20" stroke-width="1"/>
+<text x="440.0" y="418" fill="#8a8a94" font-size="11" text-anchor="middle">7.37</text>
+<line x1="562.0" y1="52" x2="562.0" y2="398" stroke="#1c1c20" stroke-width="1"/>
+<text x="562.0" y="418" fill="#8a8a94" font-size="11" text-anchor="middle">9.91</text>
+<line x1="684.0" y1="52" x2="684.0" y2="398" stroke="#1c1c20" stroke-width="1"/>
+<text x="684.0" y="418" fill="#8a8a94" font-size="11" text-anchor="middle">13.3</text>
+<line x1="806.0" y1="52" x2="806.0" y2="398" stroke="#1c1c20" stroke-width="1"/>
+<text x="806.0" y="418" fill="#8a8a94" font-size="11" text-anchor="middle">17.9</text>
+<text x="814" y="402.0" fill="#8a8a94" font-size="11">0%</text>
+<text x="814" y="332.8" fill="#8a8a94" font-size="11">20%</text>
+<text x="814" y="263.6" fill="#8a8a94" font-size="11">40%</text>
+<text x="814" y="194.4" fill="#8a8a94" font-size="11">60%</text>
+<text x="814" y="125.2" fill="#8a8a94" font-size="11">80%</text>
+<text x="814" y="56.0" fill="#8a8a94" font-size="11">100%</text>
+<path d="M230.9,228.8 L349.6,301.4 L517.0,324.1 L636.4,336.5 L806.0,340.5" fill="none" stroke="#f2b134" stroke-width="2"/>
+<circle cx="230.9" cy="228.8" r="2.6" fill="#f2b134"/>
+<circle cx="349.6" cy="301.4" r="2.6" fill="#f2b134"/>
+<circle cx="517.0" cy="324.1" r="2.6" fill="#f2b134"/>
+<circle cx="636.4" cy="336.5" r="2.6" fill="#f2b134"/>
+<circle cx="806.0" cy="340.5" r="2.6" fill="#f2b134"/>
+<path d="M230.9,244.6 L349.7,275.0 L517.0,263.7 L636.4,398.0 L806.0,382.3" fill="none" stroke="#4cc9f0" stroke-width="2"/>
+<circle cx="230.9" cy="244.6" r="2.6" fill="#4cc9f0"/>
+<circle cx="349.7" cy="275.0" r="2.6" fill="#4cc9f0"/>
+<circle cx="517.0" cy="263.7" r="2.6" fill="#4cc9f0"/>
+<circle cx="636.4" cy="398.0" r="2.6" fill="#4cc9f0"/>
+<circle cx="806.0" cy="382.3" r="2.6" fill="#4cc9f0"/>
+<path d="M74.0,92.4 L149.1,64.6 L241.5,88.8 L359.7,171.0 L526.7,145.3" fill="none" stroke="#57d99a" stroke-width="2" stroke-dasharray="5 4"/>
+<circle cx="74.0" cy="92.4" r="2.6" fill="#57d99a"/>
+<circle cx="149.1" cy="64.6" r="2.6" fill="#57d99a"/>
+<circle cx="241.5" cy="88.8" r="2.6" fill="#57d99a"/>
+<circle cx="359.7" cy="171.0" r="2.6" fill="#57d99a"/>
+<circle cx="526.7" cy="145.3" r="2.6" fill="#57d99a"/>
+<path d="M74.0,360.6 L149.1,301.8 L241.5,369.1 L359.7,386.0 L526.7,388.2" fill="none" stroke="#ef476f" stroke-width="2"/>
+<circle cx="74.0" cy="360.6" r="2.6" fill="#ef476f"/>
+<circle cx="149.1" cy="301.8" r="2.6" fill="#ef476f"/>
+<circle cx="241.5" cy="369.1" r="2.6" fill="#ef476f"/>
+<circle cx="359.7" cy="386.0" r="2.6" fill="#ef476f"/>
+<circle cx="526.7" cy="388.2" r="2.6" fill="#ef476f"/>
+<path d="M74.0,268.3 L149.1,52.0 L241.5,52.0 L359.7,52.0 L526.7,52.0" fill="none" stroke="#8d99ae" stroke-width="2" stroke-dasharray="5 4"/>
+<circle cx="74.0" cy="268.3" r="2.6" fill="#8d99ae"/>
+<circle cx="149.1" cy="52.0" r="2.6" fill="#8d99ae"/>
+<circle cx="241.5" cy="52.0" r="2.6" fill="#8d99ae"/>
+<circle cx="359.7" cy="52.0" r="2.6" fill="#8d99ae"/>
+<circle cx="526.7" cy="52.0" r="2.6" fill="#8d99ae"/>
+<rect x="74" y="434" width="16" height="3" fill="#f2b134"/>
+<text x="96" y="440" fill="#b6b6be" font-size="11">bearing p95, symbol only</text>
+<rect x="257.6" y="434" width="16" height="3" fill="#4cc9f0"/>
+<text x="279.6" y="440" fill="#b6b6be" font-size="11">bearing p95, + brackets</text>
+<rect x="434.80000000000007" y="434" width="16" height="3" fill="#57d99a"/>
+<text x="456.80000000000007" y="440" fill="#b6b6be" font-size="11">bearing p95, gates off</text>
+<rect x="605.6000000000001" y="434" width="16" height="3" fill="#ef476f"/>
+<text x="627.6000000000001" y="440" fill="#b6b6be" font-size="11">distance error p95</text>
+<rect x="750.8000000000002" y="434" width="16" height="3" fill="#8d99ae"/>
+<text x="772.8000000000002" y="440" fill="#b6b6be" font-size="11">decode rate</text>
+<text x="440" y="420" fill="#8a8a94" font-size="11" text-anchor="middle">pixels per module in the captured frame</text>
+<text x="16" y="225" fill="#8a8a94" font-size="11" text-anchor="middle" transform="rotate(-90 16 225)">bearing error, degrees (p95)</text>
+<text x="74" y="44" fill="#6c6c76" font-size="10.5">synthetic 1280x960, v2 symbol, nominal degradation. Solid: gated sweep at azimuth 22 deg. Dashed green and the right axis: gates disabled, azimuth 12 deg.</text>
+</svg>

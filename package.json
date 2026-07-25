@@ -1,0 +1,60 @@
+{
+	"name": "spatial-qr-demo",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "A QR code that can tell where you were standing when you scanned it.",
+	"license": "MIT",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"dev": "vite",
+		"build": "npm run build:client && npm run build:server",
+		"build:client": "vite build",
+		"build:server": "vite build --config vite.server.config.ts",
+		"start": "node dist/server/index.js",
+		"tls": "node scripts/https-proxy.mjs",
+		"phone": "npm run build && node scripts/phone.mjs",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"format": "biome check --write .",
+		"test": "vitest run --project l1",
+		"test:l2": "vitest run --project l2",
+		"test:all": "vitest run",
+		"test:watch": "vitest --project l1",
+		"e2e": "playwright test",
+		"e2e:install": "playwright install chromium webkit",
+		"fixtures": "vite-node scripts/make-fixtures.mts",
+		"bundle": "npm run build:client && node scripts/check-bundle.mjs",
+		"check": "npm run lint && npm run typecheck && npm run test && npm run test:l2 && npm run bundle"
+	},
+	"dependencies": {
+		"@hono/node-server": "^2.0.11",
+		"@react-three/drei": "^10.7.7",
+		"@react-three/fiber": "^9.6.1",
+		"hono": "^4.12.32",
+		"qrcode": "^1.5.4",
+		"react": "^19.2.8",
+		"react-dom": "^19.2.8",
+		"three": "^0.185.1",
+		"zxing-wasm": "^3.1.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.5",
+		"@playwright/test": "^1.62.0",
+		"@tailwindcss/vite": "^4.3.3",
+		"@types/node": "^24.10.1",
+		"@types/qrcode": "^1.5.6",
+		"@types/react": "^19.2.17",
+		"@types/react-dom": "^19.2.3",
+		"@types/three": "^0.185.1",
+		"@vitejs/plugin-react": "^6.0.4",
+		"fast-check": "^4.9.0",
+		"selfsigned": "^5.5.0",
+		"tailwindcss": "^4.3.3",
+		"typescript": "^5.9.3",
+		"vite": "^8.1.5",
+		"vitest": "^4.1.10"
+	}
+}

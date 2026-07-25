@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" class="dark">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="color-scheme" content="dark" />
+		<meta name="theme-color" content="#08080a" />
+		<title>Spatial QR — a code that knows where you stood</title>
+		<meta
+			name="description"
+			content="Point your phone at a square whose width we know. The perspective distortion in that one photograph is enough to solve for where you were standing."
+		/>
+		<meta property="og:title" content="A QR code that knows where you stood" />
+		<meta
+			property="og:description"
+			content="One photograph, no depth sensor, no AR session, no login. Then the screen draws you standing in front of it."
+		/>
+		<meta property="og:type" content="website" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2308080a'/%3E%3Crect x='5' y='5' width='9' height='9' fill='%23e8e8ea'/%3E%3Crect x='18' y='5' width='9' height='9' fill='%23e8e8ea'/%3E%3Crect x='5' y='18' width='9' height='9' fill='%23e8e8ea'/%3E%3Ccircle cx='22.5' cy='22.5' r='3.5' fill='%234cc9f0'/%3E%3C/svg%3E" />
+	</head>
+	<body>
+		<div id="root"></div>
+		<noscript>
+			This demo solves camera geometry in the browser, so it needs JavaScript. The maths is
+			written up at /how-it-works, which is readable without it.
+		</noscript>
+		<script type="module" src="/src/client/main.tsx"></script>
+	</body>
+</html>

@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+artifacts/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+# Holds generated self-signed TLS certs/keys for the HTTPS dev server.
+.playwright/
+
+# Generated camera fixtures (~45 MB, rebuilt by `npm run fixtures`)
+tests/e2e/fixtures/*.y4m
+tests/e2e/fixtures/manifest.json
+
+# Secrets / credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+
+# NOTE: public/generated/ is intentionally NOT ignored. sweep.json and
+# error-chart.svg are fetched at runtime by /how-it-works, and `npm run build`
+# does not regenerate them (only `npm run test:l2` does). A deploy from a fresh
+# clone without them renders a broken page.
