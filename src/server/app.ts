@@ -7,6 +7,7 @@ import type {
 	Viewer,
 } from "@core/api.ts";
 import { tierFromPose } from "@core/api.ts";
+import { buildExport, isExportFormat, serialiseExport } from "@core/export.ts";
 import type { MarkerLayout } from "@core/marker.ts";
 import { normaliseDestination } from "@core/redirect.ts";
 import { decodeToken, TokenError } from "@core/token.ts";
@@ -358,6 +359,38 @@ export function createApp(options: AppOptions): Hono {
 		return c.json({
 			room: await toRoomState(room, bus, token),
 			events,
+		});
+	});
+
+	/**
+	 * The room's positions, in a form another tool can read.
+	 *
+	 * A GET rather than a button's private business, so that it is scriptable:
+	 * the download on the display page is a plain link to this URL, and anything
+	 * that can fetch can have the same bytes. It reads the same room state the
+	 * page does and derives everything else, which is why the whole schema lives
+	 * in `@core/export.ts` as a pure function -- the server contributes a
+	 * content type and a filename and nothing more.
+	 */
+	api.get("/s/:token/export", async (c) => {
+		const token = requireToken(c.req.param("token"));
+		if (!token) return c.json({ error: "bad-token" }, 400);
+		const format = c.req.query("format") ?? "json";
+		if (!isExportFormat(format)) return c.json({ error: "bad-format" }, 400);
+
+		const at = now();
+		const room = await loadRoom(store, token, at);
+		pruneViewers(room, at);
+		const data = buildExport({
+			room: await toRoomState(room, bus, token),
+			exportedAt: at,
+			generator: "spatial-qr",
+		});
+		const { body, contentType, filename } = serialiseExport(data, format);
+		return c.body(body, 200, {
+			"Content-Type": contentType,
+			"Content-Disposition": `attachment; filename="${filename}"`,
+			"Cache-Control": "no-store",
 		});
 	});
 

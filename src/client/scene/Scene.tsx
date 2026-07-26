@@ -16,6 +16,11 @@ export interface SceneProps {
 	readonly photo?: HTMLCanvasElement | null;
 	/** Show eye position rather than phone position. */
 	readonly eyes?: boolean;
+	/**
+	 * Radius, in display heights, inside which the chosen text size stays
+	 * legible. Null hides the boundary entirely.
+	 */
+	readonly legibleRadiusHeights?: number | null;
 	readonly reducedMotion?: boolean;
 	readonly className?: string;
 }
@@ -100,6 +105,7 @@ function SceneContents({
 	displayAspect,
 	photo = null,
 	eyes = false,
+	legibleRadiusHeights = null,
 	reducedMotion = false,
 }: SceneProps) {
 	const displayWidthM = displayHeightM * displayAspect;
@@ -134,6 +140,12 @@ function SceneContents({
 
 			<ReferencePlane heightM={displayHeightM} />
 			<DistanceArcs displayHeightM={displayHeightM} maxScreenHeights={maxHeights(viewers)} />
+			{legibleRadiusHeights !== null && legibleRadiusHeights > 0 && (
+				<LegibilityShell
+					radiusM={legibleRadiusHeights * displayHeightM}
+					displayHeightM={displayHeightM}
+				/>
+			)}
 			<DisplayPanel widthM={displayWidthM} heightM={displayHeightM} photo={photo} />
 
 			{ghosts.map((g, i) => (
@@ -233,6 +245,39 @@ function DistanceArcs({
 					/>
 				</mesh>
 			))}
+		</group>
+	);
+}
+
+/**
+ * The line past which the screen stops being readable.
+ *
+ * Drawn as a wall rather than a floor ring because that is what it is: a
+ * boundary in the room, at head height, that a person is either inside or
+ * outside of. It is the one thing the 3D view can say that the plan view
+ * cannot, and it is honest to draw sharply -- unlike everything else here it
+ * has no error bar, because it is a ratio of two on-screen lengths and inherits
+ * none of the display's estimated physical size.
+ */
+function LegibilityShell({ radiusM, displayHeightM }: { radiusM: number; displayHeightM: number }) {
+	const y = -displayHeightM / 2;
+	const wallHeight = Math.max(0.5, displayHeightM * 1.2);
+	return (
+		<group position={[0, y, 0]}>
+			<mesh position={[0, wallHeight / 2, 0]}>
+				<cylinderGeometry args={[radiusM, radiusM, wallHeight, 72, 1, true]} />
+				<meshBasicMaterial
+					color={hex("warn")}
+					transparent
+					opacity={0.07}
+					side={THREE.DoubleSide}
+					depthWrite={false}
+				/>
+			</mesh>
+			<mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]}>
+				<ringGeometry args={[radiusM - 0.012, radiusM, 96]} />
+				<meshBasicMaterial color={hex("warn")} transparent opacity={0.55} side={THREE.DoubleSide} />
+			</mesh>
 		</group>
 	);
 }

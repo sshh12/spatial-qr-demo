@@ -125,6 +125,47 @@ test.describe("display", () => {
 		await phone.close();
 	});
 
+	test("offers the plan, the 3D and the export once somebody has scanned", async ({ page }) => {
+		await page.goto("/");
+		const url = await page.getByTestId("scan-url").innerText();
+		const token = url.split("/s/")[1]!.trim();
+
+		// An empty room has nothing to project or export, and says so by absence
+		// rather than by rendering empty furniture.
+		await expect(page.getByTestId("room-views")).toHaveCount(0);
+
+		await page.request.post(`/api/s/${token}/pose`, {
+			data: { clientId: "e2e-phone", pose: { az: -20, el: 4, dh: 2.5, sd: 0.15 } },
+		});
+
+		const views = page.getByTestId("room-views");
+		await expect(views).toBeVisible({ timeout: 20_000 });
+		// Plan first: it is the projection a visitor can check against their own
+		// memory of where they stood.
+		await expect(page.getByTestId("plan-view")).toBeVisible();
+
+		// The export is a plain link, so it is scriptable and not just clickable.
+		await expect(page.getByTestId("export-json")).toHaveAttribute(
+			"href",
+			`/api/s/${token}/export?format=json`,
+		);
+		const exported = await page.request.get(`/api/s/${token}/export?format=json`);
+		expect(exported.headers()["content-disposition"]).toContain("attachment");
+		const data = await exported.json();
+		expect(data.positions).toHaveLength(1);
+		expect(data.positions[0].spherical.azimuthDeg).toBeCloseTo(-20, 4);
+
+		await page.getByTestId("tab-scene").click();
+		// WebGL is not guaranteed in headless Chromium, and the fallback carries
+		// the same information -- so either outcome passes, and neither is a blank.
+		const canvas = page.getByTestId("scene-canvas");
+		const fallback = page.getByTestId("scene-fallback");
+		await expect(canvas.or(fallback).first()).toBeVisible({ timeout: 25_000 });
+
+		await page.getByTestId("tab-plan").click();
+		await expect(page.getByTestId("plan-view")).toBeVisible();
+	});
+
 	test("publishes the symbol edge, not the quiet-zone box", async ({ page }) => {
 		await page.goto("/");
 		const url = await page.getByTestId("scan-url").innerText();

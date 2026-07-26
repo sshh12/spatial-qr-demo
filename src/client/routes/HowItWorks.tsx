@@ -244,6 +244,42 @@ export function HowItWorks() {
 				</div>
 			</Section>
 
+			<Section title="Why I built this">
+				<p>
+					I built this because I thought it was cool that one photograph of an ordinary QR code
+					could reveal roughly where the camera was. It was not made for a client, a product, or a
+					particular use case; I just wanted to see if the idea worked and how far I could take it.
+				</p>
+				<p>Some possible uses:</p>
+				<ul className="flex flex-col gap-2 pl-4">
+					<Application title="Museums and exhibitions">
+						Put the code beside an object and send scanners to the museum&apos;s existing web page.
+						That page receives the viewing angle and distance in its URL, so it could show a detail
+						that is visible from that side or play audio matched to the visitor&apos;s position.
+					</Application>
+					<Application title="Signs, displays, and wayfinding">
+						Ask people to scan from where they naturally stop, then use the plan view, legibility
+						check, or CSV export to see whether the display is mounted well and whether its text is
+						large enough for the actual viewing distance.
+					</Application>
+					<Application title="Interactive art and spatial audio">
+						Send the scan to an installation&apos;s web controller. It can read which side of the
+						room the phone is on and how far away it is, then choose a visual layer, lighting cue,
+						or audio mix for that position. Each scan is one input, not continuous tracking.
+					</Application>
+					<Application title="Architecture and 3D previsualisation">
+						Collect scans from real seats or standing positions, export them as glTF cameras, and
+						open the file in Blender. A designer can then preview a screen, stage, or installation
+						from the viewpoints that were measured in the room.
+					</Application>
+					<Application title="Computer vision and geometry teaching">
+						Use the live result to show how perspective reveals camera position—and why one flat
+						image can sometimes produce two mirrored answers. The second-scan prompt and exported
+						mirror branch make that failure visible instead of hiding it.
+					</Application>
+				</ul>
+			</Section>
+
 			<section className="flex flex-col gap-3">
 				<h2 className="font-mono text-xs tracking-widest text-[var(--hex-dim)] uppercase">
 					Technical notes
@@ -278,6 +314,14 @@ export function HowItWorks() {
 				</TechnicalNote>
 			</section>
 		</main>
+	);
+}
+
+function Application({ title, children }: { title: string; children: React.ReactNode }) {
+	return (
+		<li className="list-disc">
+			<span className="text-[var(--hex-text)]">{title}</span> — {children}
+		</li>
 	);
 }
 

@@ -6,8 +6,9 @@ import { mintToken, payloadForToken, versionForPayload } from "@core/token.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navigate } from "../App.tsx";
 import { Marker } from "../components/Marker.tsx";
-import { PlanView } from "../components/PlanView.tsx";
+import { RoomViews } from "../components/RoomViews.tsx";
 import { api } from "../lib/api.ts";
+import { prefersReducedMotion } from "../lib/capabilities.ts";
 import { clientId, loadCalibration, rememberRoom, setTabRoom, tabRoom } from "../lib/identity.ts";
 import { useSession } from "../lib/session.ts";
 import { DEFAULT_MM_PER_CSS_PX } from "../lib/units.ts";
@@ -47,6 +48,7 @@ export function Display({ token: routeToken }: { token: string | null }) {
 
 	const { room, connection, lastEvent } = useSession(token);
 	const handheld = useHandheld();
+	const reduced = useMemo(() => prefersReducedMotion(), []);
 
 	const mmPerCssPx = loadCalibration()?.mmPerCssPx ?? DEFAULT_MM_PER_CSS_PX;
 	const origin = typeof window === "undefined" ? "" : window.location.origin;
@@ -355,11 +357,13 @@ export function Display({ token: routeToken }: { token: string | null }) {
 				ghostTotal={ghostTotal}
 			/>
 
-			{viewers.length > 0 && (
-				<section className="sqr-fade-up rounded-lg border border-[var(--hex-line)] bg-[var(--hex-surface)]/40 p-4">
-					<PlanView viewers={viewers} ghosts={ghosts} />
-				</section>
-			)}
+			<RoomViews
+				token={token}
+				room={room}
+				viewers={viewers}
+				ghosts={ghosts}
+				reducedMotion={reduced}
+			/>
 
 			{room?.redirect && (
 				<p

@@ -15,6 +15,15 @@ import {
 } from "../capture/camera.ts";
 import type { AimResult, SerialBranch, SolveResult } from "../capture/protocol.ts";
 import { DetectorClient } from "../capture/worker-client.ts";
+import type { ZoomMode, ZoomState } from "../capture/zoom.ts";
+import {
+	applyZoom,
+	detectZoom,
+	lensZoomState,
+	NO_ZOOM,
+	openLens,
+	zoomSteps,
+} from "../capture/zoom.ts";
 import { PlanView } from "../components/PlanView.tsx";
 
 /**
@@ -77,6 +86,9 @@ export function Scan({ token }: { token: string }) {
 	/** What was reported for this visitor, and therefore what may travel onward. */
 	const [reported, setReported] = useState<Omit<RedirectFacts, "token"> | null>(null);
 	const [stayed, setStayed] = useState(false);
+	const [zoomMode, setZoomMode] = useState<ZoomMode>({ kind: "none" });
+	const [zoom, setZoom] = useState<ZoomState>(NO_ZOOM);
+	const [zoomBusy, setZoomBusy] = useState(false);
 
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const previewCanvas = useRef<HTMLCanvasElement>(document.createElement("canvas"));
@@ -244,6 +256,11 @@ export function Scan({ token }: { token: string }) {
 		if (track) {
 			const info = readCameraInfo(track);
 			cameraInfo.current = { width: info.width, height: info.height };
+			// Lens labels are blank until a grant exists, so this cannot run any
+			// earlier than the line above it.
+			void detectZoom(track)
+				.then(setZoomMode)
+				.catch(() => {});
 		}
 		const video = videoRef.current;
 		if (video) {
@@ -266,6 +283,52 @@ export function Scan({ token }: { token: string }) {
 		if (stage === "aiming" && rvfcHandle.current === null) startAiming();
 	}, [stage, startAiming]);
 
+	/**
+	 * Zoom, by whichever of the two mechanisms this browser has.
+	 *
+	 * The lens branch swaps the whole stream, so it acquires the replacement
+	 * before releasing what it has: on iOS a lost camera grant cannot be asked
+	 * for again inside one page load, and this runs mid-flow. A failed swap
+	 * therefore leaves the visitor exactly where they were rather than ending
+	 * their session at the moment they tried to improve it.
+	 */
+	const onZoom = useCallback(
+		async (factor: number) => {
+			const track = streamRef.current?.getVideoTracks()[0];
+			if (!track || zoomMode.kind === "none" || zoomBusy) return;
+			setZoomBusy(true);
+			try {
+				if (zoomMode.kind === "constraint") {
+					setZoom(await applyZoom(track, factor));
+				} else {
+					const lens = zoomMode.lenses.find((l) => l.factor === factor);
+					if (!lens) return;
+					const next = await openLens(lens.deviceId);
+					if (!next) return;
+					const previous = streamRef.current;
+					streamRef.current = next;
+					const video = videoRef.current;
+					if (video) {
+						video.srcObject = next;
+						await video.play().catch(() => {});
+					}
+					releaseCamera(previous);
+					setZoom(lensZoomState(lens));
+				}
+				// A zoom or a lens swap can renegotiate the resolution, and the focal
+				// prior is expressed in pixels of whatever resolution is now in force.
+				const active = streamRef.current?.getVideoTracks()[0];
+				if (active) {
+					const info = readCameraInfo(active);
+					cameraInfo.current = { width: info.width, height: info.height };
+				}
+			} finally {
+				setZoomBusy(false);
+			}
+		},
+		[zoomMode, zoomBusy],
+	);
+
 	/** S4-S5: burst, freeze, solve. */
 	const onCapture = useCallback(async () => {
 		const video = videoRef.current;
@@ -279,8 +342,12 @@ export function Scan({ token }: { token: string }) {
 			canvas: captureCanvas.current,
 			detector: detector.current,
 			layout: activeLayout,
-			focalPx: focalPxFor(width),
-			focalSigmaLog: 0.15,
+			// The prior moves with the zoom, or zoom makes the answer worse rather
+			// than better: the solver's MAP estimate would spend the whole capture
+			// pulling a 3x focal length back toward a 26mm-equivalent prior, and
+			// the posterior width scales the reported position radially.
+			focalPx: focalPxFor(width) * zoom.focalScale,
+			focalSigmaLog: zoom.focalSigmaLog,
 			sigmaPx: 0.35,
 			frames: 8,
 			onFrame: (i, total) => setProgress((i + 1) / total),
@@ -313,7 +380,7 @@ export function Scan({ token }: { token: string }) {
 		}
 		setSolved(outcome.chosen);
 		setStage("result");
-	}, [token, activeLayout, reduced, stopAiming]);
+	}, [token, activeLayout, reduced, stopAiming, zoom]);
 
 	// Post the four numbers once we have them.
 	const posted = useRef(false);
@@ -352,7 +419,14 @@ export function Scan({ token }: { token: string }) {
 		// Every solid solve converges a focal length. Aggregated by device
 		// signature that becomes a real per-model prior, which is the larger of
 		// the two accuracy levers the commons has.
-		if (solved.tier === "solid" && cameraInfo.current?.width) {
+		//
+		// Zoomed captures are excluded outright rather than divided by their
+		// factor. The commons is keyed on a coarse device signature that says
+		// nothing about which lens was active, so a telephoto sample would land in
+		// the same bucket as a main-camera one and drag the median for every
+		// future visitor on that model. Dividing would only help if the factor
+		// were exact, and on the lens path it is inferred from a label.
+		if (solved.tier === "solid" && cameraInfo.current?.width && zoom.factor === 1) {
 			void api
 				.contributeCalibration({
 					signature: deviceSignature(),
@@ -360,7 +434,7 @@ export function Scan({ token }: { token: string }) {
 				})
 				.catch(() => {});
 		}
-	}, [stage, solved, activeLayout, token, layout, spec, refresh]);
+	}, [stage, solved, activeLayout, token, layout, spec, refresh, zoom]);
 
 	// Hard blocks, checked before anything else is offered.
 	if (!spec)
@@ -422,6 +496,10 @@ export function Scan({ token }: { token: string }) {
 					failure={failure}
 					onCapture={onCapture}
 					video={videoRef.current}
+					zoomMode={zoomMode}
+					zoom={zoom}
+					zoomBusy={zoomBusy}
+					onZoom={onZoom}
 				/>
 			) : null}
 
@@ -518,6 +596,7 @@ export function Scan({ token }: { token: string }) {
 				solved={solved}
 				camera={cameraInfo.current}
 				detached={detached}
+				zoom={zoom}
 			/>
 		</Shell>
 	);
@@ -683,6 +762,10 @@ function Viewfinder({
 	failure,
 	onCapture,
 	video,
+	zoomMode,
+	zoom,
+	zoomBusy,
+	onZoom,
 }: {
 	aim: AimResult | null;
 	stage: Stage;
@@ -690,9 +773,15 @@ function Viewfinder({
 	failure: string | null;
 	onCapture: () => void;
 	video: HTMLVideoElement | null;
+	zoomMode: ZoomMode;
+	zoom: ZoomState;
+	zoomBusy: boolean;
+	onZoom: (factor: number) => void;
 }) {
 	const size = video ? { w: video.videoWidth, h: video.videoHeight } : { w: 1, h: 1 };
-	const gauge = gaugeMessage(aim);
+	const steps = zoomSteps(zoomMode);
+	const canZoomFurther = steps.some((s) => s > zoom.factor + 0.05);
+	const gauge = gaugeMessage(aim, canZoomFurther);
 	const canCapture = Boolean(aim?.found) && gauge.ready && stage === "aiming";
 
 	return (
@@ -732,6 +821,40 @@ function Viewfinder({
 						{failure}
 					</p>
 				)}
+
+				{/*
+				 * Discrete stops rather than a slider. They are what a camera app
+				 * trains the thumb to expect, they are hittable one-handed while the
+				 * other hand holds the phone steady, and on the lens path they are
+				 * the only thing on offer anyway -- there is no continuum between two
+				 * pieces of glass.
+				 */}
+				{steps.length > 1 && stage === "aiming" && (
+					<div
+						className="flex items-center gap-1 rounded-full bg-black/60 p-1 backdrop-blur"
+						data-testid="zoom-control"
+					>
+						{steps.map((step) => {
+							const active = Math.abs(zoom.factor - step) < 0.05;
+							return (
+								<button
+									key={step}
+									type="button"
+									onClick={() => onZoom(step)}
+									disabled={zoomBusy}
+									data-testid={`zoom-${step}`}
+									aria-pressed={active}
+									className={`h-9 min-w-11 rounded-full px-3 font-mono text-xs transition disabled:opacity-40 ${
+										active ? "bg-white text-black" : "text-white"
+									}`}
+								>
+									{step < 1 ? `${step}×` : `${Math.round(step)}×`}
+								</button>
+							);
+						})}
+					</div>
+				)}
+
 				<button
 					type="button"
 					onClick={onCapture}
@@ -750,13 +873,31 @@ function Viewfinder({
  *
  * Never an instruction to move sideways. The angle *is* the measurement: asking
  * somebody to step left would change the answer we are trying to report.
+ *
+ * Zoom is offered ahead of walking for exactly the same reason. "Move closer"
+ * has always been an awkward thing for this app to say -- it buys resolution by
+ * altering the quantity being measured, so the visitor gets a good reading of
+ * somewhere they were not standing when they decided to scan. Zoom buys the
+ * same resolution and changes nothing about where they are. Where the camera
+ * offers it, it is the better instruction, and the walk is the fallback rather
+ * than the default.
  */
-function gaugeMessage(aim: AimResult | null): { text: string; ready: boolean } {
+function gaugeMessage(aim: AimResult | null, canZoom: boolean): { text: string; ready: boolean } {
 	if (!aim?.found) return { text: "Point at the code", ready: false };
 	if (aim.touchesBorder) return { text: "Step back until the whole code fits", ready: false };
-	if (aim.pxPerModule < 3.5) return { text: "Move closer — the code is too small", ready: false };
+	if (aim.pxPerModule < 3.5) {
+		return {
+			text: canZoom ? "Zoom in — the code is too small" : "Move closer — the code is too small",
+			ready: false,
+		};
+	}
 	if (aim.pxPerModule < 6) {
-		return { text: "Ready — move closer for better accuracy", ready: true };
+		return {
+			text: canZoom
+				? "Ready — zoom in for better accuracy"
+				: "Ready — move closer for better accuracy",
+			ready: true,
+		};
 	}
 	return { text: "Hold still and tap the shutter", ready: true };
 }
@@ -1333,12 +1474,14 @@ function Readout({
 	solved,
 	camera,
 	detached,
+	zoom,
 }: {
 	stage: Stage;
 	aim: AimResult | null;
 	solved: SolveResult | null;
 	camera: { width: number; height: number } | null;
 	detached: boolean;
+	zoom: ZoomState;
 }) {
 	const debug = new URLSearchParams(window.location.search).has("debug");
 	if (!debug) return null;
@@ -1346,6 +1489,10 @@ function Readout({
 
 	const parts = [
 		camera ? `camera ${camera.width}×${camera.height}` : null,
+		// The prior's width is worth showing beside the factor: on the lens path
+		// it is the number that says how much of this answer came from the
+		// photograph and how much from a guess about which glass is in front.
+		zoom.factor === 1 ? null : `zoom ${zoom.factor.toFixed(1)}× ±${zoom.focalSigmaLog.toFixed(2)}`,
 		aim?.found ? `code ${aim.pxPerModule.toFixed(1)} px/module` : null,
 		solved ? `${solved.pointCount} reference points` : null,
 		solved ? `model fit ${solved.rmsPx.toFixed(2)} px` : null,
