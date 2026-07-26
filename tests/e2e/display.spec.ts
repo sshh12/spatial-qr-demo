@@ -158,9 +158,28 @@ test.describe("display", () => {
 		await page.getByTestId("tab-scene").click();
 		// WebGL is not guaranteed in headless Chromium, and the fallback carries
 		// the same information -- so either outcome passes, and neither is a blank.
-		const canvas = page.getByTestId("scene-canvas");
+		const container = page.getByTestId("scene-canvas");
 		const fallback = page.getByTestId("scene-fallback");
-		await expect(canvas.or(fallback).first()).toBeVisible({ timeout: 25_000 });
+		await expect(container.or(fallback).first()).toBeVisible({ timeout: 25_000 });
+
+		if ((await container.count()) > 0) {
+			// And it has to fill the box that was reserved for it.
+			//
+			// r3f puts an inline `height: 100%` on the container it takes a
+			// className from, so sizing the Canvas itself silently resolves
+			// against an auto-height parent: the scene collapses to a letterbox
+			// and leaves the reserved space empty below it. Every assertion above
+			// passes in that state, which is why this one measures.
+			const box = page.getByTestId("scene-box");
+			await expect
+				.poll(async () => (await container.boundingBox())?.height ?? 0, { timeout: 20_000 })
+				.toBeGreaterThan(250);
+			const reserved = (await box.boundingBox())!.height;
+			const drawn = (await container.boundingBox())!.height;
+			expect(Math.abs(reserved - drawn), `${drawn}px canvas in a ${reserved}px box`).toBeLessThan(
+				4,
+			);
+		}
 
 		await page.getByTestId("tab-plan").click();
 		await expect(page.getByTestId("plan-view")).toBeVisible();

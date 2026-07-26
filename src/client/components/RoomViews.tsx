@@ -1,14 +1,18 @@
 import type { Ghost, RoomState, Viewer } from "@core/api.ts";
 import { displayGeometry } from "@core/export.ts";
-import {
-	COMFORTABLE_ARCMIN,
-	legibleDistanceHeights,
-	TEXT_SIZES,
-	type TextSizeId,
-	VIEWING_CONE_DEG,
-} from "@core/legibility.ts";
+import { legibleDistanceHeights, TEXT_SIZES, VIEWING_CONE_DEG } from "@core/legibility.ts";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { PlanView } from "./PlanView.tsx";
+
+/**
+ * The text size the legibility boundary is drawn for.
+ *
+ * Fixed rather than chosen. A picker turned one clear statement -- "this many
+ * people could read the screen" -- into a question the visitor has to answer
+ * before the number means anything, and slide body text is the case anybody
+ * putting a display in a room actually cares about.
+ */
+const REFERENCE_TEXT = TEXT_SIZES.find((t) => t.id === "body")!;
 
 /**
  * Three.js is a quarter of a megabyte gzipped and this page's job on load is to
@@ -39,7 +43,6 @@ export interface RoomViewsProps {
  */
 export function RoomViews({ token, room, viewers, ghosts, reducedMotion = false }: RoomViewsProps) {
 	const [tab, setTab] = useState<Tab>("plan");
-	const [textSize, setTextSize] = useState<TextSizeId>("body");
 	const [cutoff, setCutoff] = useState<number | null>(null);
 
 	const placed = useMemo(
@@ -56,9 +59,7 @@ export function RoomViews({ token, room, viewers, ghosts, reducedMotion = false 
 	);
 
 	const geometry = useMemo(() => (room ? displayGeometry(room) : null), [room]);
-	const fraction = TEXT_SIZES.find((t) => t.id === textSize)?.fraction ?? 0.026;
-	const legibleHeights = legibleDistanceHeights(fraction);
-	const comfortableHeights = legibleDistanceHeights(fraction, COMFORTABLE_ARCMIN);
+	const legibleHeights = legibleDistanceHeights(REFERENCE_TEXT.fraction);
 
 	if (placed.length === 0) return null;
 
@@ -83,13 +84,25 @@ export function RoomViews({ token, room, viewers, ghosts, reducedMotion = false 
 				<ExportLinks token={token} count={placed.length} />
 			</div>
 
-			<div className="min-h-[300px]">
-				{tab === "plan" ? (
-					<PlanView viewers={shown} ghosts={ghosts} />
-				) : (
+			{tab === "plan" ? (
+				<PlanView viewers={shown} ghosts={ghosts} />
+			) : (
+				/*
+				 * The height belongs to this wrapper, not to the Canvas.
+				 *
+				 * react-three-fiber puts an inline `height: 100%` on the container
+				 * div it forwards className to, and an inline style beats a utility
+				 * class -- so sizing the Canvas directly leaves it resolving 100%
+				 * against an auto-height parent, which collapses the scene to a
+				 * letterbox and leaves the reserved space empty underneath it.
+				 */
+				<div
+					className="h-[52vh] min-h-72 overflow-hidden rounded border border-[var(--hex-line)]"
+					data-testid="scene-box"
+				>
 					<Suspense
 						fallback={
-							<div className="flex h-[360px] items-center justify-center font-mono text-xs text-[var(--hex-dim)]">
+							<div className="flex h-full items-center justify-center font-mono text-xs text-[var(--hex-dim)]">
 								Loading the scene…
 							</div>
 						}
@@ -101,39 +114,19 @@ export function RoomViews({ token, room, viewers, ghosts, reducedMotion = false 
 							displayAspect={geometry?.aspect ?? 16 / 9}
 							legibleRadiusHeights={legibleHeights}
 							reducedMotion={reducedMotion}
-							className="h-[360px] w-full rounded"
+							className="h-full w-full"
 						/>
 					</Suspense>
-				)}
-			</div>
+				</div>
+			)}
 
 			<Scrubber positions={placed} cutoff={cutoff} onChange={setCutoff} />
 
 			<Stats
 				positions={shown}
 				legibleHeights={legibleHeights}
-				comfortableHeights={comfortableHeights}
 				heightM={geometry?.heightM ?? null}
 			/>
-
-			<div className="flex flex-wrap items-center gap-2">
-				<span className="font-mono text-[11px] text-[var(--hex-dim)]">Text size</span>
-				{TEXT_SIZES.map((size) => (
-					<button
-						key={size.id}
-						type="button"
-						onClick={() => setTextSize(size.id)}
-						aria-pressed={textSize === size.id}
-						className={`rounded border px-2.5 py-1 font-mono text-[11px] transition ${
-							textSize === size.id
-								? "border-[var(--hex-accent)] text-[var(--hex-text)]"
-								: "border-[var(--hex-line)] text-[var(--hex-dim)]"
-						}`}
-					>
-						{size.label}
-					</button>
-				))}
-			</div>
 		</section>
 	);
 }
@@ -258,12 +251,10 @@ function Scrubber({
 function Stats({
 	positions,
 	legibleHeights,
-	comfortableHeights,
 	heightM,
 }: {
 	positions: readonly Viewer[];
 	legibleHeights: number;
-	comfortableHeights: number;
 	heightM: number | null;
 }) {
 	const distances = positions.map((v) => v.pose!.dh).sort((a, b) => a - b);
@@ -292,10 +283,12 @@ function Stats({
 				value={`${inCone}/${positions.length}`}
 				note={`within ±${VIEWING_CONE_DEG}°`}
 			/>
+			{/* Named rather than configurable, so the figure reads as a fact about
+			    the room instead of the answer to a question nobody was asked. */}
 			<Stat
-				label="text legible"
+				label="could read it"
 				value={`${legible}/${positions.length}`}
-				note={`to ${legibleHeights.toFixed(1)} h, easy to ${comfortableHeights.toFixed(1)} h`}
+				note={`${REFERENCE_TEXT.label}, to ${legibleHeights.toFixed(1)} h`}
 			/>
 		</dl>
 	);
